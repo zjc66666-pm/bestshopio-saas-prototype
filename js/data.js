@@ -89,7 +89,10 @@ window.DATA = (function () {
     { domain: 'google.*', match: 'prefix_wildcard', type: 'search', platform: '', note: 'All country TLDs', updatedAt: 'Jun 10' },
     { domain: 'bing.com', match: 'registered_domain', type: 'search', platform: '', note: '', updatedAt: 'Jun 10' },
     { domain: 'duckduckgo.com', match: 'registered_domain', type: 'search', platform: '', note: '', updatedAt: 'Jun 10' },
-    { domain: 'chatgpt.com', match: 'exact_host', type: 'search', platform: '', note: 'AI search (provisional)', updatedAt: 'Jun 13' },
+    // ai (split out from search — see PRD §6 AI channel)
+    { domain: 'chatgpt.com', match: 'exact_host', type: 'ai', platform: '', note: 'ChatGPT', updatedAt: 'Jun 13' },
+    { domain: 'gemini.google.com', match: 'exact_host', type: 'ai', platform: '', note: 'Gemini (host-level; google.* stays search)', updatedAt: 'Jun 13' },
+    { domain: 'perplexity.ai', match: 'registered_domain', type: 'ai', platform: '', note: 'Perplexity', updatedAt: 'Jun 13' },
     // email
     { domain: 'mail.google.com', match: 'exact_host', type: 'email', platform: '', note: 'Webmail', updatedAt: 'Jun 10' },
     { domain: 'gmx.net', match: 'registered_domain', type: 'email', platform: '', note: 'DE market', updatedAt: 'Jun 10' },
@@ -100,11 +103,12 @@ window.DATA = (function () {
     { medium: 'email, newsletter', channel: 'Email' },
     { medium: 'social', channel: 'Social' },
     { medium: '(referrer in search dict)', channel: 'Search' },
+    { medium: '(referrer in ai dict)', channel: 'AI' },
     { medium: '(other external referrer)', channel: 'Referral' },
     { medium: '(no referrer, no utm)', channel: 'Direct' },
   ];
   const clickIds = ['gclid', 'fbclid', 'ttclid', 'msclkid'];
-  const channelPriority = ['Paid', 'Email', 'Social', 'Search', 'Referral', 'Direct'];
+  const channelPriority = ['Paid', 'Email', 'Social', 'Search', 'AI', 'Referral', 'Direct'];
 
   const model = { current: 'last_non_direct', clickWindow: 30, viewWindow: 1 };
   const session = { timeout: 30, maxLength: 24 };
