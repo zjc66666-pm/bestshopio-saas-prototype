@@ -6,10 +6,10 @@
   <title>BestShopio · Platform Center</title>
   <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="assets/tailwind-config.js?v=20260607k"></script>
-  <link rel="stylesheet" href="assets/theme.css?v=20260610g" />
+  <script src="../assets/tailwind-config.js?v=20260607k"></script>
+  <link rel="stylesheet" href="../assets/theme.css?v=20260610g" />
   <style>
-    /* Platform Center — twin of the store admin. Reuses assets/theme.css wholesale;
+    /* Platform Center — twin of the store admin. Reuses ../assets/theme.css wholesale;
        only adds the few page-level bits the store admin's modules also define locally. */
     body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; }
     /* page header (title + actions), mirrors the analytics module header */
@@ -63,13 +63,26 @@
     .ver-num { font-weight: 700; color: var(--ink); font-size: 14px; }
     .ver-sum { font-size: 13px; color: var(--ink-body); line-height: 1.5; }
     .ver-rc { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-muted); margin-top: 6px; }
+    /* top-center success toast — mirrors store admin (Ant Design message), not a bottom bar (C36) */
+    .pc-toast { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 200; display: inline-flex; align-items: center; gap: 8px; background: #fff; color: var(--ink); border: 1px solid var(--hair); border-radius: 8px; padding: 9px 16px; font-size: 13.5px; box-shadow: 0 6px 20px rgb(20 30 55 / 14%); animation: pcToastIn .18s ease; }
+    .pc-toast-ico { color: #1f8f4e; display: inline-flex; }
+    .pc-toast.pc-toast-out { opacity: 0; transform: translateX(-50%) translateY(-6px); transition: opacity .32s, transform .32s; }
+    @keyframes pcToastIn { from { opacity: 0; transform: translateX(-50%) translateY(-8px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+    /* modal close x (C25) */
+    .modal { position: relative; }
+    .modal-x { position: absolute; top: 12px; right: 12px; width: 28px; height: 28px; border: 0; background: none; border-radius: 6px; color: var(--ink-muted); cursor: pointer; display: grid; place-items: center; }
+    .modal-x:hover { background: var(--panel); color: var(--ink); }
+    /* danger button (Delete domain) */
+    .btn-danger { background: var(--err); color: #fff; border: 1px solid var(--err); }
+    .btn-danger:hover { filter: brightness(.94); }
     @media (max-width: 860px) { .two-col { grid-template-columns: 1fr; } }
-  </style>
+</style>
 </head>
 <body class="bg-page text-ink font-sans antialiased">
   <div id="app" class="flex h-screen overflow-hidden"></div>
-  <script src="js/data.js?v=1"></script>
-  <script src="js/attribution.js?v=1"></script>
-  <script src="js/app.js?v=1"></script>
+  <script src="../assets/widgets.js?v=20260609i"></script>
+  <script src="js/data.js?v=2"></script>
+  <script src="js/attribution.js?v=2"></script>
+  <script src="js/app.js?v=2"></script>
 </body>
 </html>

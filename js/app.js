@@ -36,17 +36,20 @@
   ];
 
   // ---------- shared helpers (exposed for attribution.js) ----------
+  // Top-center success toast — mirrors the store admin (Ant Design message), not a bottom bar.
   function toast(msg) {
     var t = document.createElement('div');
-    t.textContent = msg;
-    t.style.cssText = 'position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#eafaf1;color:#1f8f4e;border:1px solid #cdeedb;padding:10px 16px;border-radius:8px;font-size:13.5px;font-weight:500;z-index:200;box-shadow:0 8px 24px rgba(20,40,28,.14);max-width:560px';
+    t.className = 'pc-toast';
+    t.innerHTML = '<span class="pc-toast-ico">' + ico(P.check, 15) + '</span><span>' + msg + '</span>';
     document.body.appendChild(t);
-    setTimeout(function () { t.remove(); }, 2400);
+    setTimeout(function () { t.classList.add('pc-toast-out'); }, 2200);
+    setTimeout(function () { t.remove(); }, 2560);
   }
   function modal(html, onMount) {
     var b = document.createElement('div'); b.className = 'modal-backdrop';
-    b.innerHTML = '<div class="modal">' + html + '</div>';
+    b.innerHTML = '<div class="modal"><button class="modal-x" data-mx aria-label="Close">' + ico(P.close, 18) + '</button>' + html + '</div>';
     b.addEventListener('mousedown', function (e) { if (e.target === b) b.remove(); });
+    b.querySelectorAll('[data-mx]').forEach(function (mx) { mx.onclick = function () { b.remove(); }; });
     document.body.appendChild(b); if (onMount) onMount(b); return b;
   }
   function drawer(html, onMount) {

@@ -7,9 +7,11 @@
   var D = window.DATA, A = D.attribution;
   var ico, toast, modal, drawer, P, root;
   var tab = 'domains', domFilter = 'all';
+  var pendingModel = null; // staged radio choice for the unsaved bar (C32)
 
   var pillCls = { social: 'pill-blue', search: 'pill-green', email: 'pill-orange', exclude: 'pill-gray' };
   function typePill(t) { return '<span class="pill ' + (pillCls[t] || 'pill-gray') + '"><span class="dot"></span>' + t + '</span>'; }
+  function optList(opts, cur) { return opts.map(function (o) { return '<option' + (o === cur ? ' selected' : '') + '>' + o + '</option>'; }).join(''); }
 
   function saveCorrection() { toast('Saved. Hot-window data will be recomputed on the next ETL run.'); }
   function saveDefinition(label) {
@@ -22,17 +24,49 @@
       b.querySelector('[data-recompute]').onclick = function () { b.remove(); toast('Saved. Backfill queued (simple mode: full recompute).'); };
     });
   }
-  function addDomainModal() {
-    modal('<div class="modal-head">Add domain</div>' +
+
+  // ----- Domain Add / Edit (shared). Platform field shows only for Type=social (C20). -----
+  function domainModal(d) {
+    var isEdit = !!d;
+    d = d || { domain: '', match: 'registered_domain', type: 'social', platform: '', note: '' };
+    modal('<div class="modal-head">' + (isEdit ? 'Edit domain' : 'Add domain') + '</div>' +
       '<div class="modal-body">' +
-        '<label class="fld-label" style="margin-top:0">Domain</label><input class="input" placeholder="e.g. reddit.com">' +
-        '<label class="fld-label">Match</label><select class="input"><option>registered_domain</option><option>exact_host</option><option>prefix_wildcard</option></select>' +
-        '<label class="fld-label">Type</label><select class="input"><option>social</option><option>search</option><option>email</option><option>exclude</option></select>' +
-        '<label class="fld-label">Platform <span class="muted">(social only)</span></label><input class="input" placeholder="e.g. reddit">' +
+        '<label class="fld-label" style="margin-top:0">Domain</label><input class="input" id="dm-d" placeholder="e.g. reddit.com" value="' + d.domain + '">' +
+        '<label class="fld-label">Match</label><select class="input" id="dm-m">' + optList(['registered_domain', 'exact_host', 'prefix_wildcard'], d.match) + '</select>' +
+        '<label class="fld-label">Type</label><select class="input" id="dm-t">' + optList(['social', 'search', 'email', 'exclude'], d.type) + '</select>' +
+        '<div id="dm-pw"' + (d.type === 'social' ? '' : ' style="display:none"') + '><label class="fld-label">Platform <span class="muted">(social only)</span></label><input class="input" id="dm-p" placeholder="e.g. reddit" value="' + (d.platform || '') + '"></div>' +
       '</div>' +
-      '<div class="modal-foot"><button class="btn btn-default" data-x>Cancel</button><button class="btn btn-primary" data-save>Add</button></div>', function (b) {
-      b.querySelector('[data-x]').onclick = function () { b.remove(); };
+      '<div class="modal-foot"><button class="btn btn-default" data-mx>Cancel</button><button class="btn btn-primary" data-save>' + (isEdit ? 'Save' : 'Add') + '</button></div>', function (b) {
+      var t = b.querySelector('#dm-t'), pw = b.querySelector('#dm-pw');
+      t.addEventListener('change', function () { pw.style.display = t.value === 'social' ? '' : 'none'; });
       b.querySelector('[data-save]').onclick = function () { b.remove(); saveCorrection(); };
+    });
+  }
+  function deleteDomainModal(d) {
+    modal('<div class="modal-head">Delete domain</div>' +
+      '<div class="modal-body"><p style="font-size:13.5px;color:var(--ink-body);line-height:1.55;margin:0">Remove <b>' + d.domain + '</b> from the dictionary? This is a correction — the hot window is recomputed on the next ETL run; older history stays unchanged.</p></div>' +
+      '<div class="modal-foot"><button class="btn btn-default" data-mx>Cancel</button><button class="btn btn-danger" data-del>Delete</button></div>', function (b) {
+      b.querySelector('[data-del]').onclick = function () { b.remove(); saveCorrection(); };
+    });
+  }
+
+  // ----- Channel rules editor (C28): open the editor first; Save then prompts the Recompute decision. -----
+  function channelRulesModal() {
+    var rows = A.channelRules.map(function (r) {
+      return '<tr><td><input class="input" value="' + r.medium + '" style="height:32px"></td>' +
+        '<td><select class="input" style="height:32px">' + optList(A.channelPriority, r.channel) + '</select></td></tr>';
+    }).join('');
+    modal('<div class="modal-head">Edit channel rules</div>' +
+      '<div class="modal-body" style="max-height:60vh;overflow:auto">' +
+        '<div class="blk-title" style="font-size:13px;margin-top:0">utm_medium &rarr; channel</div>' +
+        '<table class="tbl" style="margin-bottom:16px"><thead><tr><th>Match</th><th style="width:150px">Channel</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+        '<div class="blk-title" style="font-size:13px">Paid click IDs</div>' +
+        '<div class="chip-row" style="margin-bottom:16px">' + A.clickIds.map(function (c) { return '<span class="chip" style="font-family:ui-monospace,Menlo,Consolas,monospace">' + c + '</span>'; }).join('') + '</div>' +
+        '<div class="blk-title" style="font-size:13px">Channel priority</div>' +
+        '<div class="prio-row">' + A.channelPriority.map(function (c, i) { return '<span class="prio">' + (i + 1) + '. ' + c + '</span>'; }).join('<span class="prio-arr">&rarr;</span>') + '</div>' +
+      '</div>' +
+      '<div class="modal-foot"><button class="btn btn-default" data-mx>Cancel</button><button class="btn btn-primary" data-save>Save</button></div>', function (b) {
+      b.querySelector('[data-save]').onclick = function () { b.remove(); saveDefinition('channel rules'); };
     });
   }
 
@@ -44,8 +78,8 @@
         '<td>' + typePill(d.type) + '</td>' +
         '<td>' + (d.platform ? '<span class="pill pill-blue"><span class="dot"></span>' + d.platform + '</span>' : '<span class="muted">--</span>') + '</td>' +
         '<td class="muted">' + (d.note || '--') + '</td><td class="muted">' + d.updatedAt + '</td>' +
-        '<td><span class="row-acts"><button class="row-ic" title="Edit">' + ico(P.edit, 16) + '</button>' +
-        '<button class="row-ic danger" title="Delete">' + ico(P.trash, 16) + '</button></span></td></tr>';
+        '<td><span class="row-acts"><button class="row-ic" data-edom="' + d.domain + '" title="Edit">' + ico(P.edit, 16) + '</button>' +
+        '<button class="row-ic danger" data-ddom="' + d.domain + '" title="Delete">' + ico(P.trash, 16) + '</button></span></td></tr>';
     }).join('');
     return '<div class="info-banner">' + ico(P.info, 16) + '<span>Domain dictionary maps a referrer host to a channel. Edits here are <b>corrections</b> — the hot window is recomputed automatically; older history stays unchanged.</span></div>' +
       '<div class="pc-filters">' +
@@ -84,7 +118,8 @@
 
   function tabModel() {
     function opt(val, title, sub) {
-      return '<label class="radio-card' + (A.model.current === val ? ' on' : '') + '"><input type="radio" name="model"' + (A.model.current === val ? ' checked' : '') + ' data-m="' + val + '">' +
+      var on = (pendingModel || A.model.current) === val;
+      return '<label class="radio-card' + (on ? ' on' : '') + '"><input type="radio" name="model"' + (on ? ' checked' : '') + ' data-m="' + val + '">' +
         '<div><div class="rc-title">' + title + '</div><div class="rc-sub">' + sub + '</div></div></label>';
     }
     return '<div class="info-banner">' + ico(P.info, 16) + '<span>Order-attribution model and lookback windows. <b>Definition</b> rules — changing them prompts a history-recompute decision.</span></div>' +
@@ -126,23 +161,40 @@
       '<div class="drawer-body">' + rows + '</div>');
   }
 
+  function commitModel() {
+    if (pendingModel) { A.model.current = pendingModel; pendingModel = null; }
+    if (window.UI) UI.setUnsavedBar(document, false);
+    saveDefinition('attribution model / window');
+  }
+
   function bind() {
-    root.querySelectorAll('[data-tab]').forEach(function (b) { b.onclick = function () { tab = b.getAttribute('data-tab'); paint(); }; });
+    root.querySelectorAll('[data-tab]').forEach(function (b) { b.onclick = function () { pendingModel = null; if (window.UI) UI.setUnsavedBar(document, false); tab = b.getAttribute('data-tab'); paint(); }; });
     var dt = root.querySelector('#domType'); if (dt) dt.onchange = function () { domFilter = dt.value; paint(); };
-    var add = root.querySelector('#addDom'); if (add) add.onclick = addDomainModal;
-    root.querySelectorAll('.row-ic').forEach(function (b) { b.onclick = function () { toast('Demo — action stubbed'); }; });
-    var ec = root.querySelector('#editChannel'); if (ec) ec.onclick = function () { saveDefinition('channel rules'); };
-    var sm = root.querySelector('#saveModel'); if (sm) sm.onclick = function () { saveDefinition('attribution model / window'); };
+    var add = root.querySelector('#addDom'); if (add) add.onclick = function () { domainModal(null); };
+    root.querySelectorAll('[data-edom]').forEach(function (b) { b.onclick = function () { var dm = A.domains.filter(function (x) { return x.domain === b.getAttribute('data-edom'); })[0]; domainModal(dm); }; });
+    root.querySelectorAll('[data-ddom]').forEach(function (b) { b.onclick = function () { var dm = A.domains.filter(function (x) { return x.domain === b.getAttribute('data-ddom'); })[0]; deleteDomainModal(dm); }; });
+    var ec = root.querySelector('#editChannel'); if (ec) ec.onclick = channelRulesModal;
+    var sm = root.querySelector('#saveModel'); if (sm) sm.onclick = commitModel;
     var ss = root.querySelector('#saveSession'); if (ss) ss.onclick = function () { saveDefinition('session thresholds'); };
-    root.querySelectorAll('[data-m]').forEach(function (r) { r.onchange = function () { A.model.current = r.getAttribute('data-m'); paint(); }; });
+    root.querySelectorAll('[data-m]').forEach(function (r) {
+      r.onchange = function () {
+        pendingModel = r.getAttribute('data-m');
+        root.querySelectorAll('.radio-card').forEach(function (c) { c.classList.remove('on'); });
+        var card = r.closest('.radio-card'); if (card) card.classList.add('on');
+        if (window.UI) UI.setUnsavedBar(document, true);
+      };
+    });
     var vh = root.querySelector('#verHist'); if (vh) vh.onclick = versionDrawer;
     var pub = root.querySelector('#publish'); if (pub) pub.onclick = function () { toast('Published v13 — the data warehouse reads the new rule set on its next ETL run.'); };
+    root.querySelectorAll('[data-act="save-bar"]').forEach(function (b) { b.onclick = commitModel; });
+    root.querySelectorAll('[data-act="discard"]').forEach(function (b) { b.onclick = function () { pendingModel = null; if (window.UI) UI.setUnsavedBar(document, false); paint(); }; });
   }
 
   function paint() {
     var body = tab === 'channel' ? tabChannel() : tab === 'model' ? tabModel() : tab === 'session' ? tabSession() : tabDomains();
     var cur = A.versions[0];
-    root.innerHTML =
+    var bar = (tab === 'model' && window.UI) ? UI.unsavedBar({ saveLabel: 'Save model' }) : '';
+    root.innerHTML = bar +
       '<div class="view-wrap"><div class="pc-head"><div>' +
         '<div class="page-title">Attribution rules</div>' +
         '<div class="pc-sub">Platform-wide attribution config. Maintained here, read by the data warehouse — the data team executes, business owns the rules.</div></div>' +
