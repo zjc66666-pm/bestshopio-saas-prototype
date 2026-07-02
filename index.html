@@ -1,16 +1,15 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>BestShopio · Platform Center</title>
+  <title>BestShopio Platform Center</title>
   <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="assets/tailwind-config.js?v=20260607k"></script>
-  <link rel="stylesheet" href="assets/theme.css?v=20260616a" />
+  <link rel="stylesheet" href="assets/theme.css?v=20260610g" />
   <style>
-    /* Platform Center — twin of the store admin. Reuses assets/theme.css wholesale;
-       only adds the few page-level bits the store admin's modules also define locally. */
+    /* Platform Center: twin of the store admin. Reuses assets/theme.css wholesale;\n       only adds the few page-level bits the store admin modules also define locally. */
     body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; }
     /* page header (title + actions), mirrors the analytics module header */
     .pc-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
@@ -29,7 +28,33 @@
     .tree-sp { width: 22px; display: inline-block; flex: none; }
     .tree-ico { color: var(--ink-muted); display: inline-flex; }
     .perm-tag { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #6d28d9; background: #efe9ff; border-radius: 5px; padding: 1px 7px; }
+    .menu-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; align-items: start; }
+    .menu-table-wrap { overflow-x: auto; }
+    .menu-table-wrap .tbl { min-width: 1180px; }
+    .menu-code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; color: var(--ink-body); }
+    .pill-main { background: #eef4ff; color: #1d4ed8; }
+    .pill-channel { background: #ecfdf5; color: #047857; }
+    .pill-app { background: #fff7ed; color: #c2410c; }
+    .pill-settings { background: #f3f4f6; color: #4b5563; }
+    .pill-hidden { background: #f4f4f5; color: #71717a; }
+    .menu-preview { position: sticky; top: 16px; display: flex; flex-direction: column; gap: 12px; }
+    .preview-shell { border: 1px solid var(--hair); border-radius: 12px; background: #fff; overflow: hidden; }
+    .preview-head { padding: 14px 14px 10px; border-bottom: 1px solid var(--hair); }
+    .preview-title { font-size: 13px; font-weight: 700; color: var(--ink); }
+    .preview-nav { padding: 10px; display: flex; flex-direction: column; gap: 3px; min-height: 420px; }
+    .preview-nav.compact { min-height: auto; }
+    .settings-preview .preview-item { height: 30px; }
+    .preview-item { height: 32px; display: flex; align-items: center; gap: 9px; border-radius: 8px; padding: 0 10px; font-size: 13px; color: var(--ink-body); }
+    .preview-item.active { background: #eef3ff; color: var(--brand); font-weight: 600; }
+    .preview-icon { width: 16px; height: 16px; border-radius: 4px; background: #e5e7eb; flex: none; }
+    .preview-label { margin: 11px 10px 5px; font-size: 11px; color: var(--ink-muted); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+    .preview-spacer { flex: 1; min-height: 22px; }
     .row-acts { display: flex; gap: 2px; }
+    .menu-type-inline { display: flex; align-items: center; gap: 14px; padding: 10px 12px; border: 1px solid var(--hair); border-radius: 8px; background: var(--panel); }
+    .menu-type-inline-label { font-size: 13px; font-weight: 600; color: var(--ink-body); margin-right: 4px; }
+    .menu-type-inline label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-body); }
+    .menu-type-inline input { accent-color: var(--brand); }
+    .modal .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
     .row-ic { width: 28px; height: 28px; border: 0; background: none; border-radius: 6px; color: var(--ink-muted); cursor: pointer; display: grid; place-items: center; }
     .row-ic:hover { background: var(--panel); color: var(--ink); }
     .row-ic.danger:hover { background: #fdecea; color: var(--err); }
@@ -63,26 +88,50 @@
     .ver-num { font-weight: 700; color: var(--ink); font-size: 14px; }
     .ver-sum { font-size: 13px; color: var(--ink-body); line-height: 1.5; }
     .ver-rc { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-muted); margin-top: 6px; }
-    /* top-center success toast — mirrors store admin (Ant Design message), not a bottom bar (C36) */
+    /* Top-center success toast mirrors store admin Ant Design message. */
     .pc-toast { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 200; display: inline-flex; align-items: center; gap: 8px; background: #fff; color: var(--ink); border: 1px solid var(--hair); border-radius: 8px; padding: 9px 16px; font-size: 13.5px; box-shadow: 0 6px 20px rgb(20 30 55 / 14%); animation: pcToastIn .18s ease; }
     .pc-toast-ico { color: #1f8f4e; display: inline-flex; }
     .pc-toast.pc-toast-out { opacity: 0; transform: translateX(-50%) translateY(-6px); transition: opacity .32s, transform .32s; }
     @keyframes pcToastIn { from { opacity: 0; transform: translateX(-50%) translateY(-8px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
     /* modal close x (C25) */
     .modal { position: relative; }
+    .modal:has(.menu-modal-body) { width: min(520px, calc(100vw - 40px)); }
+    .modal:has(.perm-modal-body) { width: min(520px, calc(100vw - 40px)); }
+    .menu-modal-body { max-height: 68vh; overflow: auto; }
+    .perm-modal-body { padding-top: 14px; }
+    .fld-label.required::before { content: '*'; color: var(--err); margin-right: 4px; font-weight: 500; }
+    .menu-modal-body .input, .perm-modal-body .input { box-sizing: border-box; }
+    .count-input { position: relative; width: 100%; box-sizing: border-box; }
+    .count-input .input { width: 100%; padding-right: 68px; box-sizing: border-box; }
+    .count-input span { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--ink-muted); font-size: 13px; pointer-events: none; }
+    .image-upload { display: flex; flex-direction: column; gap: 8px; }
+    .upload-card { width: 104px; height: 104px; border: 1px dashed var(--ctl); border-radius: 8px; background: #fff; color: var(--ink-muted); display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: pointer; font-size: 13px; position: relative; overflow: hidden; }
+    .upload-card:hover { border-color: var(--brand); color: var(--brand); }
+    .upload-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .upload-plus { display: inline-flex; color: inherit; }
+    .upload-remove { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 999px; background: rgba(15, 23, 42, .72); color: #fff; display: grid; place-items: center; }
     .modal-x { position: absolute; top: 12px; right: 12px; width: 28px; height: 28px; border: 0; background: none; border-radius: 6px; color: var(--ink-muted); cursor: pointer; display: grid; place-items: center; }
     .modal-x:hover { background: var(--panel); color: var(--ink); }
     /* danger button (Delete domain) */
     .btn-danger { background: var(--err); color: #fff; border: 1px solid var(--err); }
     .btn-danger:hover { filter: brightness(.94); }
+    @media (max-width: 1100px) { .menu-layout { grid-template-columns: 1fr; } .menu-preview { position: static; } }
     @media (max-width: 860px) { .two-col { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body class="bg-page text-ink font-sans antialiased">
   <div id="app" class="flex h-screen overflow-hidden"></div>
   <script src="assets/widgets.js?v=20260609i"></script>
-  <script src="js/data.js?v=3"></script>
-  <script src="js/attribution.js?v=3"></script>
-  <script src="js/app.js?v=3"></script>
+  <script src="js/data.js?v=20260702m"></script>
+  <script src="js/attribution.js?v=2"></script>
+  <script src="js/app.js?v=20260702m"></script>
+  <!-- Runtime i18n overlay: default ZH, top-right toggle can switch back to EN. -->
+  <script src="assets/i18n.js?v=20260628a"></script>
+  <script src="assets/i18n/platform.js?v=20260702m"></script>
 </body>
 </html>
+
+
+
+
+

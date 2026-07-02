@@ -1,4 +1,4 @@
-/* Platform Center — shell + router + simple views (Menu / Account / Category).
+/* Platform Center - shell + router + simple views (Menu / Account / Category).
    Twin of the store admin: same chrome (.shell-root / .app-header / .app-body /
    .app-sidebar / .nav-item / #root), same theme.css component classes.
    Attribution lives in attribution.js. */
@@ -36,12 +36,12 @@
   ];
 
   // ---------- shared helpers (exposed for attribution.js) ----------
-  // Top-center success toast — mirrors the store admin (Ant Design message), not a bottom bar.
   function toast(msg) {
     var t = document.createElement('div');
     t.className = 'pc-toast';
     t.innerHTML = '<span class="pc-toast-ico">' + ico(P.check, 15) + '</span><span>' + msg + '</span>';
     document.body.appendChild(t);
+    if (window.I18N) window.I18N.apply(t);
     setTimeout(function () { t.classList.add('pc-toast-out'); }, 2200);
     setTimeout(function () { t.remove(); }, 2560);
   }
@@ -50,7 +50,7 @@
     b.innerHTML = '<div class="modal"><button class="modal-x" data-mx aria-label="Close">' + ico(P.close, 18) + '</button>' + html + '</div>';
     b.addEventListener('mousedown', function (e) { if (e.target === b) b.remove(); });
     b.querySelectorAll('[data-mx]').forEach(function (mx) { mx.onclick = function () { b.remove(); }; });
-    document.body.appendChild(b); if (onMount) onMount(b); return b;
+    document.body.appendChild(b); if (onMount) onMount(b); if (window.I18N) window.I18N.apply(b); return b;
   }
   function drawer(html, onMount) {
     var b = document.createElement('div'); b.className = 'drawer-backdrop';
@@ -58,16 +58,309 @@
     b.addEventListener('mousedown', function (e) { if (e.target === b) b.remove(); });
     document.body.appendChild(b);
     b.querySelectorAll('[data-x]').forEach(function (x) { x.onclick = function () { b.remove(); }; });
-    if (onMount) onMount(b); return b;
+    if (onMount) onMount(b); if (window.I18N) window.I18N.apply(b); return b;
   }
   window.PC = { ico: ico, toast: toast, modal: modal, drawer: drawer, P: P };
 
   // ---------- views ----------
   var root;
-  var menuOpen = { 2: true, 3: true };
+  var menuOpen = { 2: true, 3: true, 2008: true };
+  var menuContext = 'main';
   var catOpen = { 1: true, 2: true, 3: true };
 
   function pillType() {} // (attribution-only)
+
+  function esc(v) {
+    return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+    });
+  }
+
+  function titleCase(v) {
+    return String(v || '').replace(/_/g, ' ').replace(/\b\w/g, function (m) { return m.toUpperCase(); });
+  }
+
+  function slug(v) {
+    return String(v || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  }
+
+  function groupPill(group) {
+    var g = group || 'main';
+    var labels = { main: 'Main', channel: 'Channel', app: 'App', settings_context: 'Settings menu' };
+    var klass = g === 'settings_context' ? 'settings' : g;
+    return '<span class="pill pill-' + esc(klass) + '">' + esc(labels[g] || titleCase(g)) + '</span>';
+  }
+
+  function currentMenuTree() {
+    return menuContext === 'settings' ? D.settingsMenuTree : D.menuTree;
+  }
+
+  function currentGroupOptions() {
+    return menuContext === 'settings'
+      ? [{ value: 'settings_context', label: 'Settings menu' }]
+      : D.menuSchema.navGroups;
+  }
+
+  function flattenMenus(nodes, parent, out) {
+    out = out || [];
+    (nodes || []).forEach(function (m) {
+      out.push({ item: m, parent: parent || null });
+      flattenMenus(m.children || [], m, out);
+    });
+    return out;
+  }
+
+  function findMenu(id) {
+    var hit = null;
+    flattenMenus(currentMenuTree()).some(function (row) { if (row.item.id === id) { hit = row; return true; } return false; });
+    return hit;
+  }
+
+  function nextIds() {
+    var menu = 1, perm = 1;
+    flattenMenus(currentMenuTree()).forEach(function (row) {
+      menu = Math.max(menu, Number(row.item.id || 0) + 1);
+      (row.item.permissions || []).forEach(function (p) { perm = Math.max(perm, Number(p.id || 0) + 1); });
+    });
+    return { menu: menu, perm: perm };
+  }
+
+  function removeMenu(id) {
+    function rm(list) {
+      var idx = list.findIndex(function (m) { return m.id === id; });
+      if (idx >= 0) return list.splice(idx, 1)[0];
+      for (var i = 0; i < list.length; i++) {
+        var got = rm(list[i].children || []);
+        if (got) return got;
+      }
+      return null;
+    }
+    return rm(currentMenuTree());
+  }
+
+  function removePermission(id) {
+    var removed = null;
+    flattenMenus(currentMenuTree()).some(function (row) {
+      var list = row.item.permissions || [];
+      var idx = list.findIndex(function (p) { return p.id === id; });
+      if (idx >= 0) { removed = list.splice(idx, 1)[0]; return true; }
+      return false;
+    });
+    return removed;
+  }
+
+  function parentOptions(excludeId) {
+    return currentMenuTree().filter(function (m) { return m.id !== excludeId; }).map(function (m) {
+      return '<option value="' + esc(m.id) + '">' + esc(m.title) + '</option>';
+    }).join('');
+  }
+
+  function optionList(list, selected) {
+    return list.map(function (o) {
+      var value = typeof o === 'string' ? o : o.value;
+      var label = typeof o === 'string' ? titleCase(o) : o.label;
+      return '<option value="' + esc(value) + '"' + (value === selected ? ' selected' : '') + '>' + esc(label) + '</option>';
+    }).join('');
+  }
+
+  function insertMenu(record, pid) {
+    if (pid) {
+      var parent = findMenu(Number(pid));
+      if (parent) {
+        parent.item.children = parent.item.children || [];
+        parent.item.children.push(record);
+        menuOpen[parent.item.id] = true;
+        return;
+      }
+    }
+    currentMenuTree().push(record);
+  }
+
+  function flattenActiveMenus(nodes, group) {
+    var out = [];
+    (nodes || []).forEach(function (m) {
+      if ((m.navGroup || 'main') === group && m.type !== 'group_title') out.push(m);
+      (m.children || []).forEach(function (c) {
+        if ((c.navGroup || m.navGroup || 'main') === group && c.type !== 'group_title') out.push(c);
+      });
+    });
+    return out.sort(function (a, b) { return (b.sort || 0) - (a.sort || 0); });
+  }
+
+  function sidebarPreview() {
+    function item(m, active) {
+      return '<div class="preview-item' + (active ? ' active' : '') + '"><span class="preview-icon"></span><span>' + esc(m.title) + '</span></div>';
+    }
+    if (menuContext === 'settings') {
+      var settingsContext = (D.settingsMenuTree || []).slice().sort(function (a, b) { return (b.sort || 0) - (a.sort || 0); });
+      return '<aside class="menu-preview"><div class="preview-shell settings-preview">' +
+        '<div class="preview-head"><div class="preview-title">Settings menu</div></div>' +
+        '<div class="preview-nav compact">' + settingsContext.map(function (m, i) { return item(m, i === 0); }).join('') + '</div></div></aside>';
+    }
+    var main = flattenActiveMenus(D.menuTree, 'main').filter(function (m) { return m.type === 'menu'; });
+    var channel = flattenActiveMenus(D.menuTree, 'channel');
+    var app = flattenActiveMenus(D.menuTree, 'app');
+    var settings = [{ title: 'Settings', route: '/admin/settings/base' }];
+    return '<aside class="menu-preview"><div class="preview-shell">' +
+      '<div class="preview-head"><div class="preview-title">Store admin sidebar</div></div>' +
+      '<div class="preview-nav compact">' +
+      main.map(function (m, i) { return item(m, i === 0); }).join('') +
+      '<div class="preview-label">Channels</div>' + channel.map(function (m) { return item(m); }).join('') +
+      (app.length ? '<div class="preview-label">Apps</div>' + app.map(function (m) { return item(m); }).join('') : '') +
+      '<div class="preview-spacer"></div>' + settings.map(function (m) { return item(m); }).join('') +
+      '</div></div></aside>';
+  }
+
+  function field(label, html, hint) {
+    return '<label class="fld-label">' + label + '</label>' + html + (hint ? '<p class="fld-hint">' + hint + '</p>' : '');
+  }
+
+  function bindCount(scope, inputId, countId) {
+    var input = scope.querySelector(inputId);
+    var count = scope.querySelector(countId);
+    if (!input || !count) return;
+    function paint() { count.textContent = String(input.value.length) + ' / 100'; }
+    input.addEventListener('input', paint);
+    paint();
+  }
+
+  function menuDialog(mode, record, presetParentId) {
+    var isEdit = mode === 'edit';
+    var isSettingsContext = menuContext === 'settings';
+    var current = record || {};
+    var found = current.id ? findMenu(current.id) : null;
+    var level = found && found.parent ? 'level_2' : (current.type === 'submenu' ? 'level_2' : 'level_1');
+    var parentId = presetParentId || (found && found.parent ? found.parent.id : '');
+    var ids = nextIds();
+    var dialogTitle = isSettingsContext ? (isEdit ? 'Edit settings menu' : 'Add settings menu') : (isEdit ? 'Edit menu' : 'Add menu');
+    var groupField = isSettingsContext ? '' : '<div>' + field('Group', '<select class="input" id="mGroup">' + optionList(currentGroupOptions(), current.navGroup || 'main') + '</select>') + '</div>';
+    var form = '<div class="modal-head">' + dialogTitle + '</div>' +
+      '<div class="modal-body menu-modal-body">' +
+        '<div class="menu-type-inline" style="margin-bottom:12px"><span class="menu-type-inline-label">Menu type</span>' +
+          '<label><input type="radio" name="menuLevel" value="level_1"' + (level === 'level_1' ? ' checked' : '') + (isEdit ? ' disabled' : '') + '> Level 1 Menu</label>' +
+          '<label><input type="radio" name="menuLevel" value="level_2"' + (level === 'level_2' ? ' checked' : '') + (isEdit ? ' disabled' : '') + '> Level 2 Menu</label></div>' +
+        '<div id="parentWrap"' + (level === 'level_2' ? '' : ' style="display:none"') + '><label class="fld-label required">Menu category</label><select class="input" id="mParent"><option value="">Select a menu category</option>' + parentOptions(current.id) + '</select></div>' +
+        '<label class="fld-label required">Menu title</label>' +
+        '<div class="count-input"><input class="input" id="mTitle" maxlength="100" placeholder="Please enter menu title" value="' + esc(current.title || '') + '"><span id="mTitleCount">0 / 100</span></div>' +
+        '<label class="fld-label' + (level === 'level_1' ? ' required' : '') + '" id="mIconLabel">Icon</label>' +
+        '<div class="image-upload"><input type="hidden" id="mIcon" value="' + esc(current.icon || '') + '"><input type="file" id="mIconFile" accept=".png,.jpg,.jpeg,.gif,.webp" hidden><button type="button" class="upload-card" id="mIconPick">' + (current.icon ? '<img src="' + esc(current.icon) + '" alt=""><span class="upload-remove" id="mIconRemove">' + ico(P.close, 12) + '</span>' : '<span class="upload-plus">' + ico(P.plus, 20) + '</span>') + '</button></div>' +
+        '<label class="fld-label required">Route</label>' +
+        '<div class="count-input"><input class="input" id="mRoute" maxlength="100" placeholder="Please enter route" value="' + esc(current.route || '') + '"><span id="mRouteCount">0 / 100</span></div>' +
+        '<div class="two-col" style="gap:12px;grid-template-columns:' + (isSettingsContext ? '1fr' : '1fr 1fr') + '">' +
+          '<div>' + field('Sort', '<input class="input" id="mSort" type="number" min="1" max="9999" placeholder="Higher sort show first" value="' + esc(current.sort || '') + '">') + '</div>' +
+          groupField +
+        '</div>' +
+      '</div>' +
+      '<div class="modal-foot"><button class="btn btn-default" data-mx>Cancel</button><button class="btn btn-primary" id="saveMenu">' + (isEdit ? 'Update' : 'Add') + '</button></div>';
+
+    modal(form, function (b) {
+      var parentSelect = b.querySelector('#mParent');
+      if (parentSelect && parentId) parentSelect.value = String(parentId);
+      bindCount(b, '#mTitle', '#mTitleCount');
+      bindCount(b, '#mRoute', '#mRouteCount');
+      var iconInput = b.querySelector('#mIcon');
+      var iconFile = b.querySelector('#mIconFile');
+      var iconPick = b.querySelector('#mIconPick');
+      function paintIcon(value) {
+        iconPick.innerHTML = value ? '<img src="' + esc(value) + '" alt=""><span class="upload-remove" id="mIconRemove">' + ico(P.close, 12) + '</span>' : '<span class="upload-plus">' + ico(P.plus, 20) + '</span>';
+      }
+      iconPick.onclick = function (ev) {
+        if (ev.target.closest && ev.target.closest('#mIconRemove')) { iconInput.value = ''; paintIcon(''); return; }
+        iconFile.click();
+      };
+      iconFile.onchange = function () {
+        var file = iconFile.files && iconFile.files[0];
+        if (!file) return;
+        var url = URL.createObjectURL(file);
+        iconInput.value = url;
+        paintIcon(url);
+      };
+      b.querySelectorAll('input[name="menuLevel"]').forEach(function (r) {
+        r.onchange = function () {
+          var isLevel2 = r.value === 'level_2';
+          b.querySelector('#parentWrap').style.display = isLevel2 ? '' : 'none';
+          b.querySelector('#mIconLabel').classList.toggle('required', !isLevel2);
+        };
+      });
+      b.querySelector('#saveMenu').onclick = function () {
+        var selectedLevel = (b.querySelector('input[name="menuLevel"]:checked') || {}).value || level;
+        var title = b.querySelector('#mTitle').value.trim();
+        var icon = b.querySelector('#mIcon').value.trim();
+        var route = b.querySelector('#mRoute').value.trim();
+        var pid = selectedLevel === 'level_2' ? Number((b.querySelector('#mParent') || {}).value || 0) : 0;
+        if (!title || (!isEdit && selectedLevel === 'level_1' && !icon) || !route || (selectedLevel === 'level_2' && !pid)) { toast('Please complete required fields'); return; }
+        var payload = {
+          id: isEdit ? current.id : ids.menu,
+          title: title,
+          icon: icon,
+          route: route,
+          sort: Number(b.querySelector('#mSort').value || 0),
+          type: selectedLevel === 'level_2' ? 'submenu' : 'menu',
+          navGroup: isSettingsContext ? 'settings_context' : b.querySelector('#mGroup').value,
+          children: current.children || [],
+          permissions: current.permissions || []
+        };
+        if (isEdit) removeMenu(current.id);
+        insertMenu(payload, pid);
+        b.remove();
+        toast(isSettingsContext ? (isEdit ? 'Settings menu updated' : 'Settings menu added') : (isEdit ? 'Menu updated' : 'Menu added'));
+        viewMenu();
+      };
+    });
+  }
+
+  function permissionDialog(mode, permission, menuId) {
+    var isEdit = mode === 'edit';
+    var ids = nextIds();
+    var options = flattenMenus(currentMenuTree()).map(function (row) {
+      return '<option value="' + row.item.id + '">' + esc(row.item.title) + '</option>';
+    }).join('');
+    modal('<div class="modal-head">' + (isEdit ? 'Edit permission' : 'Add permission') + '</div>' +
+      '<div class="modal-body perm-modal-body">' +
+        '<label class="fld-label required">Menu category</label>' +
+        '<select class="input" id="pMenu"><option value="">Select a menu category</option>' + options + '</select>' +
+        '<label class="fld-label required">Permission title</label>' +
+        '<div class="count-input"><input class="input" id="pTitle" maxlength="100" placeholder="Please enter permission title" value="' + esc(permission ? permission.title : '') + '"><span id="pTitleCount">0 / 100</span></div>' +
+        '<label class="fld-label required">Route</label>' +
+        '<div class="count-input"><input class="input" id="pRoute" maxlength="100" placeholder="Please enter route" value="' + esc(permission ? permission.route : '') + '"><span id="pRouteCount">0 / 100</span></div>' +
+      '</div>' +
+      '<div class="modal-foot"><button class="btn btn-default" data-mx>Cancel</button><button class="btn btn-primary" id="savePerm">' + (isEdit ? 'Update' : 'Add') + '</button></div>', function (b) {
+        b.querySelector('#pMenu').value = String(menuId || (permission && permission.menu_id) || '');
+        bindCount(b, '#pTitle', '#pTitleCount');
+        bindCount(b, '#pRoute', '#pRouteCount');
+        b.querySelector('#savePerm').onclick = function () {
+          var targetMenuId = Number(b.querySelector('#pMenu').value || 0);
+          var title = b.querySelector('#pTitle').value.trim();
+          var route = b.querySelector('#pRoute').value.trim();
+          if (!targetMenuId || !title || !route) { toast('Please complete required fields'); return; }
+          if (isEdit) removePermission(permission.id);
+          var target = findMenu(targetMenuId);
+          if (!target) { toast('Menu not found'); return; }
+          target.item.permissions = target.item.permissions || [];
+          target.item.permissions.push({ id: isEdit ? permission.id : ids.perm, menu_id: targetMenuId, title: title, route: route });
+          menuOpen[targetMenuId] = true;
+          b.remove();
+          toast(isEdit ? 'Permission updated' : 'Permission added');
+          viewMenu();
+        };
+      });
+  }
+
+  function confirmDelete(kind, label, onConfirm) {
+    modal('<div class="modal-head">Delete ' + kind + '</div>' +
+      '<div class="modal-body"><p style="font-size:13.5px;color:var(--ink-body);line-height:1.55;margin:0">Delete <b>' + esc(label) + '</b>? This only updates the prototype mock data.</p></div>' +
+      '<div class="modal-foot"><button class="btn btn-default" data-mx>Cancel</button><button class="btn btn-danger" id="confirmDelete">Delete</button></div>', function (b) {
+        b.querySelector('#confirmDelete').onclick = function () { onConfirm(); b.remove(); viewMenu(); toast(kind === 'menu' ? 'Menu deleted' : 'Permission deleted'); };
+      });
+  }
+
+  function findPermission(id) {
+    var hit = null;
+    flattenMenus(currentMenuTree()).some(function (row) {
+      return (row.item.permissions || []).some(function (p) { if (p.id === id) { hit = { permission: p, menu: row.item }; return true; } return false; });
+    });
+    return hit;
+  }
 
   function viewMenu() {
     var rows = [];
@@ -77,35 +370,51 @@
       rows.push('<tr><td><span class="tree" style="padding-left:' + (lvl - 1) * 20 + 'px">' +
         (kids ? '<button class="tree-tg" data-exp="' + m.id + '">' + ico(open ? P.down : P.right, 16) + '</button>' : '<span class="tree-sp"></span>') +
         (lvl === 1 ? '<span class="tree-ico">' + ico(P.menu, 16) + '</span>' : '') +
-        '<span>' + m.title + '</span></span></td>' +
-        '<td class="muted" style="font-family:ui-monospace,Menlo,Consolas,monospace">' + m.route + '</td>' +
-        '<td><span class="pill pill-gray">' + m.type + '</span></td>' +
-        '<td class="num">' + m.sort + '</td>' +
-        '<td><span class="row-acts"><button class="row-ic" title="Add permission">' + ico(P.plus, 16) + '</button>' +
-        '<button class="row-ic" title="Edit">' + ico(P.edit, 16) + '</button>' +
-        '<button class="row-ic danger" title="Delete">' + ico(P.trash, 16) + '</button></span></td></tr>');
+        '<span>' + esc(m.title) + '</span></span></td>' +
+        '<td>' + groupPill(m.navGroup || 'main') + '</td>' +
+        '<td class="menu-code">' + esc(m.route || '--') + '</td>' +
+        '<td class="num">' + esc(m.sort) + '</td>' +
+        '<td><span class="row-acts"><button class="row-ic" data-act="add-perm" data-id="' + m.id + '" title="Add permission">' + ico(P.plus, 16) + '</button>' +
+        '<button class="row-ic" data-act="edit-menu" data-id="' + m.id + '" title="Edit menu">' + ico(P.edit, 16) + '</button>' +
+        '<button class="row-ic danger" data-act="delete-menu" data-id="' + m.id + '" title="Delete menu">' + ico(P.trash, 16) + '</button></span></td></tr>');
       if (open) {
         (m.children || []).forEach(function (c) { push(c, lvl + 1); });
         (m.permissions || []).forEach(function (p) {
           rows.push('<tr><td><span class="tree" style="padding-left:' + (lvl * 20 + 8) + 'px">' +
-            '<span class="tree-sp"></span><span class="perm-tag">permission</span><span>' + p.title + '</span></span></td>' +
-            '<td class="muted" style="font-family:ui-monospace,Menlo,Consolas,monospace">' + p.route + '</td><td></td><td></td>' +
-            '<td><span class="row-acts"><button class="row-ic" title="Edit">' + ico(P.edit, 16) + '</button>' +
-            '<button class="row-ic danger" title="Delete">' + ico(P.trash, 16) + '</button></span></td></tr>');
+            '<span class="tree-sp"></span><span class="perm-tag">permission</span><span>' + esc(p.title) + '</span></span></td>' +
+            '<td></td><td class="menu-code">' + esc(p.route) + '</td><td></td>' +
+            '<td><span class="row-acts"><button class="row-ic" data-act="edit-perm" data-id="' + p.id + '" title="Edit permission">' + ico(P.edit, 16) + '</button>' +
+            '<button class="row-ic danger" data-act="delete-perm" data-id="' + p.id + '" title="Delete permission">' + ico(P.trash, 16) + '</button></span></td></tr>');
         });
       }
     }
-    D.menuTree.forEach(function (m) { push(m, 1); });
+    currentMenuTree().forEach(function (m) { push(m, 1); });
     root.innerHTML =
       '<div class="view-wrap"><div class="pc-head"><div>' +
-        '<div class="page-title">Menu</div>' +
-        '<div class="pc-sub">Platform back-office menus and permission points — the RBAC catalog assigned to roles.</div></div>' +
-        '<button class="btn btn-primary">' + ico(P.plus, 16) + 'Add menu</button></div>' +
-      '<div class="panel" style="overflow:hidden"><table class="tbl">' +
-        '<thead><tr><th>Menu title</th><th>Route</th><th>Type</th><th class="num">Sort</th><th style="width:120px">Actions</th></tr></thead>' +
-        '<tbody>' + rows.join('') + '</tbody></table></div></div>';
+        '<div class="page-title">Menu</div></div>' +
+        '<div class="pc-acts"><button class="btn btn-default" id="topAddPerm">Add permission</button><button class="btn btn-primary" id="topAddMenu">' + ico(P.plus, 16) + (menuContext === 'settings' ? 'Add settings menu' : 'Add menu') + '</button></div></div>' +
+      '<div class="tabs" id="menuContextTabs" style="padding:0 8px;margin:0 0 10px"><div class="tab' + (menuContext === 'main' ? ' active' : '') + '" data-context="main">Main sidebar</div><div class="tab' + (menuContext === 'settings' ? ' active' : '') + '" data-context="settings">Settings menu</div></div>' +
+      '<div class="pc-filters"><select class="filter-select"><option>Menu title</option><option>Route</option><option>Group</option></select>' +
+        '<span class="pc-search">' + ico(P.search, 16) + '<input class="filter-input" placeholder="Search"></span></div>' +
+      '<div class="menu-layout"><div class="panel menu-table-wrap"><table class="tbl">' +
+        '<thead><tr><th>Menu title</th><th>Group</th><th>Route</th><th class="num">Sort</th><th style="width:120px">Actions</th></tr></thead>' +
+        '<tbody>' + rows.join('') + '</tbody></table></div>' + sidebarPreview() + '</div></div>';
+    root.querySelectorAll('[data-context]').forEach(function (b) { b.onclick = function () { menuContext = b.getAttribute('data-context'); viewMenu(); }; });
     root.querySelectorAll('[data-exp]').forEach(function (b) { b.onclick = function () { var id = +b.getAttribute('data-exp'); menuOpen[id] = !menuOpen[id]; viewMenu(); }; });
-    root.querySelectorAll('.row-ic').forEach(function (b) { b.onclick = function () { toast('Demo — action stubbed'); }; });
+    root.querySelector('#topAddMenu').onclick = function () { menuDialog('add'); };
+    root.querySelector('#topAddPerm').onclick = function () { permissionDialog('add'); };
+    root.querySelectorAll('[data-act]').forEach(function (b) {
+      b.onclick = function () {
+        var act = b.getAttribute('data-act');
+        var id = Number(b.getAttribute('data-id'));
+        if (act === 'add-perm') permissionDialog('add', null, id);
+        if (act === 'edit-menu') { var row = findMenu(id); if (row) menuDialog('edit', row.item); }
+        if (act === 'delete-menu') { var rm = findMenu(id); if (rm) confirmDelete('menu', rm.item.title, function () { removeMenu(id); }); }
+        if (act === 'edit-perm') { var fp = findPermission(id); if (fp) permissionDialog('edit', fp.permission, fp.menu.id); }
+        if (act === 'delete-perm') { var dp = findPermission(id); if (dp) confirmDelete('permission', dp.permission.title, function () { removePermission(id); }); }
+      };
+    });
+    if (window.I18N) window.I18N.apply(root);
   }
 
   function viewAccount() {
@@ -125,6 +434,7 @@
       '<div class="panel" style="overflow:hidden"><table class="tbl">' +
         '<thead><tr><th style="width:24%">Account</th><th style="width:46%">Store</th><th>Status</th></tr></thead>' +
         '<tbody>' + rows + '</tbody></table></div></div>';
+    if (window.I18N) window.I18N.apply(root);
   }
 
   function viewCategory() {
@@ -151,15 +461,17 @@
         '<thead><tr><th style="width:60%">Category name</th><th>Platform ID</th><th style="width:100px">Actions</th></tr></thead>' +
         '<tbody>' + rows.join('') + '</tbody></table></div></div>';
     root.querySelectorAll('[data-cat]').forEach(function (b) { b.onclick = function () { var id = +b.getAttribute('data-cat'); catOpen[id] = !catOpen[id]; viewCategory(); }; });
-    root.querySelectorAll('.row-ic').forEach(function (b) { b.onclick = function () { toast('Demo — action stubbed'); }; });
+    root.querySelectorAll('.row-ic').forEach(function (b) { b.onclick = function () { toast('Demo action stubbed'); }; });
+    if (window.I18N) window.I18N.apply(root);
   }
 
   // ---------- sidebar + header chrome (mirrors store admin shell.js) ----------
   var navEl;
   function renderSidebar(active) {
-    navEl.innerHTML = '<div class="nav-group-label">Platform</div>' + NAV.map(function (n) {
+    navEl.innerHTML = NAV.map(function (n) {
       return '<a class="nav-item' + (n.id === active ? ' active' : '') + '" href="#/' + n.id + '">' + navico(n.icon) + '<span>' + n.label + '</span></a>';
     }).join('');
+    if (window.I18N) window.I18N.apply(navEl);
   }
   function userMenuHtml() {
     return '<div class="hdr-menu-head">' + ico(P.user, 16) + '<span>ryan@bestvoy.com</span></div>' +
@@ -197,7 +509,6 @@
     navEl = app.querySelector('.nav-scroll');
     root = document.getElementById('root');
 
-    // user dropdown (reuse store-admin .hdr-menu pattern)
     var ub = app.querySelector('#hdr-user');
     ub.onclick = function (e) {
       e.stopPropagation();
@@ -206,9 +517,9 @@
       if (exist) return;
       var pop = document.createElement('div'); pop.className = 'hdr-menu'; pop.innerHTML = userMenuHtml();
       wrap.appendChild(pop);
+      if (window.I18N) window.I18N.apply(pop);
       setTimeout(function () { document.addEventListener('mousedown', function h(ev) { if (!ev.target.closest('.hdr-menu-wrap')) { pop.remove(); document.removeEventListener('mousedown', h); } }); }, 0);
     };
-    // mobile drawer
     var bd = document.createElement('div'); bd.className = 'sidebar-backdrop'; document.body.appendChild(bd);
     var aside = app.querySelector('.app-sidebar'), tg = app.querySelector('.sidebar-toggle');
     tg.onclick = function () { aside.classList.toggle('open'); bd.classList.toggle('show'); };
@@ -218,6 +529,7 @@
     if (!location.hash) location.replace('#/menu');
     window.addEventListener('hashchange', dispatch);
     dispatch();
+    if (window.I18N) window.I18N.apply(app);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', build);
