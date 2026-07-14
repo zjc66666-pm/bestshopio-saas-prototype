@@ -16,8 +16,8 @@
     .pc-sub { font-size: 13px; color: var(--ink-muted); margin-top: 4px; max-width: 760px; line-height: 1.5; }
     .pc-acts { display: flex; align-items: center; gap: 8px; flex: none; }
     .pc-eff { font-size: 12.5px; color: var(--ink-muted); }
-    /* list filter bar (mirrors the reports-list pattern: select + search + right action) */
-    .pc-filters { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+    /* list filter panel: same bordered container used by Store Admin list pages */
+    .pc-filters { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; padding: 14px 16px; border: 1px solid var(--hair); border-radius: 12px; background: #fff; }
     .pc-search { position: relative; display: inline-flex; align-items: center; }
     .pc-search > svg { position: absolute; left: 10px; color: var(--ink-muted); pointer-events: none; }
     .pc-spacer { flex: 1; }
@@ -29,13 +29,15 @@
     .tree-ico { color: var(--ink-muted); display: inline-flex; }
     .perm-tag { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #6d28d9; background: #efe9ff; border-radius: 5px; padding: 1px 7px; }
     .menu-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; align-items: start; }
+    .menu-list { min-width: 0; }
+    .menu-list .pc-filters { margin-bottom: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
     .menu-table-wrap { overflow-x: auto; }
+    .menu-list .menu-table-wrap { border-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
     .menu-table-wrap .tbl { min-width: 1180px; }
     .menu-code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; color: var(--ink-body); }
     .pill-main { background: #eef4ff; color: #1d4ed8; }
     .pill-channel { background: #ecfdf5; color: #047857; }
     .pill-app { background: #fff7ed; color: #c2410c; }
-    .pill-settings { background: #f3f4f6; color: #4b5563; }
     .pill-hidden { background: #f4f4f5; color: #71717a; }
     .menu-preview { position: sticky; top: 16px; display: flex; flex-direction: column; gap: 12px; }
     .preview-shell { border: 1px solid var(--hair); border-radius: 12px; background: #fff; overflow: hidden; }
@@ -43,7 +45,6 @@
     .preview-title { font-size: 13px; font-weight: 700; color: var(--ink); }
     .preview-nav { padding: 10px; display: flex; flex-direction: column; gap: 3px; min-height: 420px; }
     .preview-nav.compact { min-height: auto; }
-    .settings-preview .preview-item { height: 30px; }
     .preview-item { height: 32px; display: flex; align-items: center; gap: 9px; border-radius: 8px; padding: 0 10px; font-size: 13px; color: var(--ink-body); }
     .preview-item.active { background: #eef3ff; color: var(--brand); font-weight: 600; }
     .preview-icon { width: 16px; height: 16px; border-radius: 4px; background: #e5e7eb; flex: none; }
@@ -122,9 +123,9 @@
 <body class="bg-page text-ink font-sans antialiased">
   <div id="app" class="flex h-screen overflow-hidden"></div>
   <script src="assets/widgets.js?v=20260609i"></script>
-  <script src="js/data.js?v=20260702n"></script>
+  <script src="js/data.js?v=20260714a"></script>
   <script src="js/attribution.js?v=2"></script>
-  <script src="js/app.js?v=20260702n"></script>
+  <script src="js/app.js?v=20260714a"></script>
   <!-- Runtime i18n overlay: default ZH, top-right toggle can switch back to EN. -->
   <script src="assets/i18n.js?v=20260628a"></script>
   <script src="assets/i18n/platform.js?v=20260702n"></script>

@@ -64,8 +64,7 @@
 
   // ---------- views ----------
   var root;
-  var menuOpen = { 2: true, 3: true, 2008: true };
-  var menuContext = 'main';
+  var menuOpen = { 2: true, 3: true, 13: true };
   var catOpen = { 1: true, 2: true, 3: true };
 
   function pillType() {} // (attribution-only)
@@ -86,19 +85,16 @@
 
   function groupPill(group) {
     var g = group || 'main';
-    var labels = { main: 'Main', channel: 'Channel', app: 'App', settings_context: 'Settings menu' };
-    var klass = g === 'settings_context' ? 'settings' : g;
-    return '<span class="pill pill-' + esc(klass) + '">' + esc(labels[g] || titleCase(g)) + '</span>';
+    var labels = { main: 'Main', channel: 'Channel', app: 'App' };
+    return '<span class="pill pill-' + esc(g) + '">' + esc(labels[g] || titleCase(g)) + '</span>';
   }
 
   function currentMenuTree() {
-    return menuContext === 'settings' ? D.settingsMenuTree : D.menuTree;
+    return D.menuTree;
   }
 
   function currentGroupOptions() {
-    return menuContext === 'settings'
-      ? [{ value: 'settings_context', label: 'Settings menu' }]
-      : D.menuSchema.navGroups;
+    return D.menuSchema.navGroups;
   }
 
   function flattenMenus(nodes, parent, out) {
@@ -187,20 +183,18 @@
     return out.sort(function (a, b) { return (b.sort || 0) - (a.sort || 0); });
   }
 
+  function isSettingsRoot(menu) {
+    return menu && menu.route === '/admin/settings';
+  }
+
   function sidebarPreview() {
     function item(m, active) {
       return '<div class="preview-item' + (active ? ' active' : '') + '"><span class="preview-icon"></span><span>' + esc(m.title) + '</span></div>';
     }
-    if (menuContext === 'settings') {
-      var settingsContext = (D.settingsMenuTree || []).slice().sort(function (a, b) { return (b.sort || 0) - (a.sort || 0); });
-      return '<aside class="menu-preview"><div class="preview-shell settings-preview">' +
-        '<div class="preview-head"><div class="preview-title">Settings menu</div></div>' +
-        '<div class="preview-nav compact">' + settingsContext.map(function (m, i) { return item(m, i === 0); }).join('') + '</div></div></aside>';
-    }
-    var main = flattenActiveMenus(D.menuTree, 'main').filter(function (m) { return m.type === 'menu'; });
+    var settings = D.menuTree.filter(isSettingsRoot);
+    var main = flattenActiveMenus(D.menuTree, 'main').filter(function (m) { return m.type === 'menu' && !isSettingsRoot(m); });
     var channel = flattenActiveMenus(D.menuTree, 'channel');
     var app = flattenActiveMenus(D.menuTree, 'app');
-    var settings = [{ title: 'Settings', route: '/admin/settings/base' }];
     return '<aside class="menu-preview"><div class="preview-shell">' +
       '<div class="preview-head"><div class="preview-title">Store admin sidebar</div></div>' +
       '<div class="preview-nav compact">' +
@@ -226,14 +220,13 @@
 
   function menuDialog(mode, record, presetParentId) {
     var isEdit = mode === 'edit';
-    var isSettingsContext = menuContext === 'settings';
     var current = record || {};
     var found = current.id ? findMenu(current.id) : null;
     var level = found && found.parent ? 'level_2' : (current.type === 'submenu' ? 'level_2' : 'level_1');
     var parentId = presetParentId || (found && found.parent ? found.parent.id : '');
     var ids = nextIds();
-    var dialogTitle = isSettingsContext ? (isEdit ? 'Edit settings menu' : 'Add settings menu') : (isEdit ? 'Edit menu' : 'Add menu');
-    var groupField = isSettingsContext ? '' : '<div>' + field('Group', '<select class="input" id="mGroup">' + optionList(currentGroupOptions(), current.navGroup || 'main') + '</select>') + '</div>';
+    var dialogTitle = isEdit ? 'Edit menu' : 'Add menu';
+    var groupField = '<div id="groupWrap"' + (level === 'level_2' ? ' style="display:none"' : '') + '>' + field('Group', '<select class="input" id="mGroup">' + optionList(currentGroupOptions(), current.navGroup || 'main') + '</select>') + '</div>';
     var form = '<div class="modal-head">' + dialogTitle + '</div>' +
       '<div class="modal-body menu-modal-body">' +
         '<div class="menu-type-inline" style="margin-bottom:12px"><span class="menu-type-inline-label">Menu type</span>' +
@@ -246,7 +239,7 @@
         '<div class="image-upload"><input type="hidden" id="mIcon" value="' + esc(current.icon || '') + '"><input type="file" id="mIconFile" accept=".png,.jpg,.jpeg,.gif,.webp" hidden><button type="button" class="upload-card" id="mIconPick">' + (current.icon ? '<img src="' + esc(current.icon) + '" alt=""><span class="upload-remove" id="mIconRemove">' + ico(P.close, 12) + '</span>' : '<span class="upload-plus">' + ico(P.plus, 20) + '</span>') + '</button></div>' +
         '<label class="fld-label required">Route</label>' +
         '<div class="count-input"><input class="input" id="mRoute" maxlength="100" placeholder="Please enter route" value="' + esc(current.route || '') + '"><span id="mRouteCount">0 / 100</span></div>' +
-        '<div class="two-col" style="gap:12px;grid-template-columns:' + (isSettingsContext ? '1fr' : '1fr 1fr') + '">' +
+        '<div class="two-col" id="menuMetaGrid" style="gap:12px;grid-template-columns:' + (level === 'level_2' ? '1fr' : '1fr 1fr') + '">' +
           '<div>' + field('Sort', '<input class="input" id="mSort" type="number" min="1" max="9999" placeholder="Higher sort show first" value="' + esc(current.sort || '') + '">') + '</div>' +
           groupField +
         '</div>' +
@@ -280,6 +273,8 @@
           var isLevel2 = r.value === 'level_2';
           b.querySelector('#parentWrap').style.display = isLevel2 ? '' : 'none';
           b.querySelector('#mIconLabel').classList.toggle('required', !isLevel2);
+          b.querySelector('#groupWrap').style.display = isLevel2 ? 'none' : '';
+          b.querySelector('#menuMetaGrid').style.gridTemplateColumns = isLevel2 ? '1fr' : '1fr 1fr';
         };
       });
       b.querySelector('#saveMenu').onclick = function () {
@@ -288,7 +283,8 @@
         var icon = b.querySelector('#mIcon').value.trim();
         var route = b.querySelector('#mRoute').value.trim();
         var pid = selectedLevel === 'level_2' ? Number((b.querySelector('#mParent') || {}).value || 0) : 0;
-        if (!title || (!isEdit && selectedLevel === 'level_1' && !icon) || !route || (selectedLevel === 'level_2' && !pid)) { toast('Please complete required fields'); return; }
+        var parent = selectedLevel === 'level_2' ? findMenu(pid) : null;
+        if (!title || (!isEdit && selectedLevel === 'level_1' && !icon) || !route || (selectedLevel === 'level_2' && (!pid || !parent))) { toast('Please complete required fields'); return; }
         var payload = {
           id: isEdit ? current.id : ids.menu,
           title: title,
@@ -296,14 +292,14 @@
           route: route,
           sort: Number(b.querySelector('#mSort').value || 0),
           type: selectedLevel === 'level_2' ? 'submenu' : 'menu',
-          navGroup: isSettingsContext ? 'settings_context' : b.querySelector('#mGroup').value,
           children: current.children || [],
           permissions: current.permissions || []
         };
+        if (selectedLevel !== 'level_2') payload.navGroup = b.querySelector('#mGroup').value;
         if (isEdit) removeMenu(current.id);
         insertMenu(payload, pid);
         b.remove();
-        toast(isSettingsContext ? (isEdit ? 'Settings menu updated' : 'Settings menu added') : (isEdit ? 'Menu updated' : 'Menu added'));
+        toast(isEdit ? 'Menu updated' : 'Menu added');
         viewMenu();
       };
     });
@@ -371,7 +367,7 @@
         (kids ? '<button class="tree-tg" data-exp="' + m.id + '">' + ico(open ? P.down : P.right, 16) + '</button>' : '<span class="tree-sp"></span>') +
         (lvl === 1 ? '<span class="tree-ico">' + ico(P.menu, 16) + '</span>' : '') +
         '<span>' + esc(m.title) + '</span></span></td>' +
-        '<td>' + groupPill(m.navGroup || 'main') + '</td>' +
+        '<td>' + (lvl === 1 ? groupPill(m.navGroup || 'main') : '') + '</td>' +
         '<td class="menu-code">' + esc(m.route || '--') + '</td>' +
         '<td class="num">' + esc(m.sort) + '</td>' +
         '<td><span class="row-acts"><button class="row-ic" data-act="add-perm" data-id="' + m.id + '" title="Add permission">' + ico(P.plus, 16) + '</button>' +
@@ -392,14 +388,12 @@
     root.innerHTML =
       '<div class="view-wrap"><div class="pc-head"><div>' +
         '<div class="page-title">Menu</div></div>' +
-        '<div class="pc-acts"><button class="btn btn-default" id="topAddPerm">Add permission</button><button class="btn btn-primary" id="topAddMenu">' + ico(P.plus, 16) + (menuContext === 'settings' ? 'Add settings menu' : 'Add menu') + '</button></div></div>' +
-      '<div class="tabs" id="menuContextTabs" style="padding:0 8px;margin:0 0 10px"><div class="tab' + (menuContext === 'main' ? ' active' : '') + '" data-context="main">Main sidebar</div><div class="tab' + (menuContext === 'settings' ? ' active' : '') + '" data-context="settings">Settings menu</div></div>' +
-      '<div class="pc-filters"><select class="filter-select"><option>Menu title</option><option>Route</option><option>Group</option></select>' +
+        '<div class="pc-acts"><button class="btn btn-default" id="topAddPerm">Add permission</button><button class="btn btn-primary" id="topAddMenu">' + ico(P.plus, 16) + 'Add menu</button></div></div>' +
+      '<div class="menu-layout"><div class="menu-list"><div class="pc-filters"><select class="filter-select"><option>Menu title</option><option>Route</option><option>Group</option></select>' +
         '<span class="pc-search">' + ico(P.search, 16) + '<input class="filter-input" placeholder="Search"></span></div>' +
-      '<div class="menu-layout"><div class="panel menu-table-wrap"><table class="tbl">' +
+      '<div class="panel menu-table-wrap"><table class="tbl">' +
         '<thead><tr><th>Menu title</th><th>Group</th><th>Route</th><th class="num">Sort</th><th style="width:120px">Actions</th></tr></thead>' +
-        '<tbody>' + rows.join('') + '</tbody></table></div>' + sidebarPreview() + '</div></div>';
-    root.querySelectorAll('[data-context]').forEach(function (b) { b.onclick = function () { menuContext = b.getAttribute('data-context'); viewMenu(); }; });
+        '<tbody>' + rows.join('') + '</tbody></table></div></div>' + sidebarPreview() + '</div></div>';
     root.querySelectorAll('[data-exp]').forEach(function (b) { b.onclick = function () { var id = +b.getAttribute('data-exp'); menuOpen[id] = !menuOpen[id]; viewMenu(); }; });
     root.querySelector('#topAddMenu').onclick = function () { menuDialog('add'); };
     root.querySelector('#topAddPerm').onclick = function () { permissionDialog('add'); };

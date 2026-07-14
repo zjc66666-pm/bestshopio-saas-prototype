@@ -2,7 +2,8 @@
    V1.145 Menu models the store-admin sidebar source of truth:
    - menu_level/type still controls the tree depth.
    - navGroup controls where the item appears: Main / Channel / App.
-   - Settings stays as a fixed lower-left entry in Store Admin; no placement config is exposed.
+   - Settings is a regular root menu record. Store Admin recognizes the
+     /admin/settings root route and pins it at the lower left; no separate source exists.
    UI copy English-only, no emoji. */
 window.DATA = (function () {
   const menuSchema = {
@@ -21,17 +22,17 @@ window.DATA = (function () {
       { id: 203, menu_id: 2, title: 'Edit shipping address', route: 'orders:edit_shipping_address' },
       { id: 204, menu_id: 2, title: 'Refund', route: 'orders:refund' } ] },
     { id: 3, title: 'Products', route: '/admin/products', sort: 90, type: 'menu', navGroup: 'main', children: [
-      { id: 31, title: 'Collections', route: '/admin/products/collections', sort: 80, type: 'submenu', navGroup: 'main', permissions: [
+      { id: 31, title: 'Collections', route: '/admin/products/collections', sort: 80, type: 'submenu', permissions: [
         { id: 301, menu_id: 31, title: 'Collection list', route: 'products:collections:list' },
         { id: 302, menu_id: 31, title: 'Add collection', route: 'products:collections:add' } ] },
-      { id: 32, title: 'Reviews', route: '/admin/products/reviews', sort: 70, type: 'submenu', navGroup: 'main', permissions: [
+      { id: 32, title: 'Reviews', route: '/admin/products/reviews', sort: 70, type: 'submenu', permissions: [
         { id: 303, menu_id: 32, title: 'Review list', route: 'products:reviews:list' } ] } ] },
     { id: 4, title: 'Customers', route: '/admin/customers', sort: 80, type: 'menu', navGroup: 'main' },
     { id: 5, title: 'Discounts', route: '/admin/discount', sort: 70, type: 'menu', navGroup: 'main' },
     { id: 8, title: 'Content', route: '/admin/content/blog', sort: 60, type: 'menu', navGroup: 'main', children: [
-      { id: 81, title: 'Blog', route: '/admin/content/blog', sort: 60, type: 'submenu', navGroup: 'main' },
-      { id: 82, title: 'Page', route: '/admin/content/page', sort: 50, type: 'submenu', navGroup: 'main' },
-      { id: 83, title: 'Menu', route: '/admin/content/menu', sort: 40, type: 'submenu', navGroup: 'main' } ] },
+      { id: 81, title: 'Blog', route: '/admin/content/blog', sort: 60, type: 'submenu' },
+      { id: 82, title: 'Page', route: '/admin/content/page', sort: 50, type: 'submenu' },
+      { id: 83, title: 'Menu', route: '/admin/content/menu', sort: 40, type: 'submenu' } ] },
     { id: 9, title: 'Online store', route: '/admin/channels/online-store', sort: 50, type: 'menu', navGroup: 'channel' },
     { id: 10, title: 'Meta', route: '/admin/channels/meta', sort: 45, type: 'menu', navGroup: 'channel', permissions: [
       { id: 1001, menu_id: 10, title: 'Edit Meta tracking', route: 'channels:meta:tracking:update' } ] },
@@ -39,32 +40,28 @@ window.DATA = (function () {
       { id: 1101, menu_id: 11, title: 'Edit Google tracking', route: 'channels:google:tracking:update' },
       { id: 1102, menu_id: 11, title: 'Product sync settings', route: 'channels:google:products:update' } ] },
     { id: 12, title: 'BestCheckout', route: '/admin/apps/bestcheckout', sort: 30, type: 'menu', navGroup: 'app' },
-  ];
-
-  // ---- Settings menu context. Store Admin opens this after clicking the fixed Settings entry. ----
-  const settingsMenuTree = [
-    { id: 2001, title: 'Basic settings', route: '/admin/settings/base', sort: 100, type: 'menu', navGroup: 'settings_context', permissions: [
-      { id: 200101, menu_id: 2001, title: 'View basic settings', route: 'settings:base:view' },
-      { id: 200102, menu_id: 2001, title: 'Edit basic settings', route: 'settings:base:update' } ] },
-    { id: 2002, title: 'Payments', route: '/admin/settings/payments', sort: 90, type: 'menu', navGroup: 'settings_context', permissions: [
-      { id: 200201, menu_id: 2002, title: 'View payments', route: 'settings:payments:view' },
-      { id: 200202, menu_id: 2002, title: 'Edit payments', route: 'settings:payments:update' } ] },
-    { id: 2003, title: 'Currency', route: '/admin/settings/currency', sort: 80, type: 'menu', navGroup: 'settings_context' },
-    { id: 2004, title: 'Checkout', route: '/admin/settings/checkout', sort: 70, type: 'menu', navGroup: 'settings_context' },
-    { id: 2005, title: 'Metafields', route: '/admin/settings/metafields', sort: 60, type: 'menu', navGroup: 'settings_context' },
-    { id: 2006, title: 'Ship locations', route: '/admin/settings/shippable-locations', sort: 50, type: 'menu', navGroup: 'settings_context' },
-    { id: 2007, title: 'Shipping rates', route: '/admin/settings/shipping-rates', sort: 40, type: 'menu', navGroup: 'settings_context' },
-    { id: 2008, title: 'Staff and permissions', route: '/admin/settings/roles', sort: 30, type: 'menu', navGroup: 'settings_context', children: [
-      { id: 20081, title: 'Roles', route: '/admin/settings/roles', sort: 20, type: 'submenu', navGroup: 'settings_context', permissions: [
-        { id: 200811, menu_id: 20081, title: 'View roles', route: 'settings:roles:view' },
-        { id: 200812, menu_id: 20081, title: 'Add role', route: 'settings:roles:add' },
-        { id: 200813, menu_id: 20081, title: 'Edit role', route: 'settings:roles:update' },
-        { id: 200814, menu_id: 20081, title: 'Delete role', route: 'settings:roles:delete' } ] },
-      { id: 20082, title: 'Staff', route: '/admin/settings/staff', sort: 10, type: 'submenu', navGroup: 'settings_context', permissions: [
-        { id: 200821, menu_id: 20082, title: 'View staff', route: 'settings:staff:view' },
-        { id: 200822, menu_id: 20082, title: 'Invite staff', route: 'settings:staff:invite' },
-        { id: 200823, menu_id: 20082, title: 'Edit staff', route: 'settings:staff:update' },
-        { id: 200824, menu_id: 20082, title: 'Delete staff', route: 'settings:staff:delete' } ] } ] },
+    { id: 13, title: 'Settings', route: '/admin/settings', sort: 30, type: 'menu', navGroup: 'main', children: [
+      { id: 131, title: 'Basic settings', route: '/admin/settings/basic_settings', sort: 70, type: 'submenu', permissions: [
+        { id: 13101, menu_id: 131, title: 'View basic settings', route: 'settings:base:view' },
+        { id: 13102, menu_id: 131, title: 'Edit basic settings', route: 'settings:base:update' } ] },
+      { id: 132, title: 'Payments', route: '/admin/settings/payments', sort: 60, type: 'submenu', permissions: [
+        { id: 13201, menu_id: 132, title: 'View payments', route: 'settings:payments:view' },
+        { id: 13202, menu_id: 132, title: 'Edit payments', route: 'settings:payments:update' } ] },
+      { id: 133, title: 'Currency', route: '/admin/settings/currency', sort: 50, type: 'submenu' },
+      { id: 134, title: 'Checkout', route: '/admin/settings/checkout', sort: 40, type: 'submenu' },
+      { id: 135, title: 'Metafields', route: '/admin/settings/metafields', sort: 30, type: 'submenu' },
+      { id: 136, title: 'Ship locations', route: '/admin/settings/ship_locations', sort: 20, type: 'submenu' },
+      { id: 137, title: 'Shipping rates', route: '/admin/settings/shipping_rates', sort: 10, type: 'submenu' },
+      { id: 138, title: 'Role', route: '/admin/settings/staff-permissions/roles', sort: 9, type: 'submenu', permissions: [
+        { id: 13801, menu_id: 138, title: 'View roles', route: 'settings:roles:view' },
+        { id: 13802, menu_id: 138, title: 'Add role', route: 'settings:roles:add' },
+        { id: 13803, menu_id: 138, title: 'Edit role', route: 'settings:roles:update' },
+        { id: 13804, menu_id: 138, title: 'Delete role', route: 'settings:roles:delete' } ] },
+      { id: 139, title: 'Staff', route: '/admin/settings/staff-permissions/staff', sort: 8, type: 'submenu', permissions: [
+        { id: 13901, menu_id: 139, title: 'View staff', route: 'settings:staff:view' },
+        { id: 13902, menu_id: 139, title: 'Invite staff', route: 'settings:staff:invite' },
+        { id: 13903, menu_id: 139, title: 'Edit staff', route: 'settings:staff:update' },
+        { id: 13904, menu_id: 139, title: 'Delete staff', route: 'settings:staff:delete' } ] } ] },
   ];
 
   // Expected Store Admin sidebar after Store backend groups menu records and Store Admin pins Settings to the bottom.
@@ -92,25 +89,22 @@ window.DATA = (function () {
     app: [
       { key: 'bestcheckout', title: 'BestCheckout', route: '/admin/apps/bestcheckout' },
     ],
-    settingsContext: [
-      { key: 'settings_base', title: 'Basic settings', route: '/admin/settings/base' },
+    settings: { key: 'settings', title: 'Settings', route: '/admin/settings', children: [
+      { key: 'settings_base', title: 'Basic settings', route: '/admin/settings/basic_settings' },
       { key: 'settings_payments', title: 'Payments', route: '/admin/settings/payments' },
       { key: 'settings_currency', title: 'Currency', route: '/admin/settings/currency' },
       { key: 'settings_checkout', title: 'Checkout', route: '/admin/settings/checkout' },
       { key: 'settings_metafields', title: 'Metafields', route: '/admin/settings/metafields' },
-      { key: 'settings_ship_locations', title: 'Ship locations', route: '/admin/settings/shippable-locations' },
-      { key: 'settings_shipping_rates', title: 'Shipping rates', route: '/admin/settings/shipping-rates' },
-      { key: 'settings_staff_permissions', title: 'Staff and permissions', route: '/admin/settings/roles', children: [
-        { key: 'settings_roles', title: 'Roles', route: '/admin/settings/roles' },
-        { key: 'settings_staff', title: 'Staff', route: '/admin/settings/staff' },
-      ] },
-    ],
+      { key: 'settings_ship_locations', title: 'Ship locations', route: '/admin/settings/ship_locations' },
+      { key: 'settings_shipping_rates', title: 'Shipping rates', route: '/admin/settings/shipping_rates' },
+      { key: 'settings_role', title: 'Role', route: '/admin/settings/staff-permissions/roles' },
+      { key: 'settings_staff', title: 'Staff', route: '/admin/settings/staff-permissions/staff' },
+    ] },
   };
 
-  // Store Roles should read this combined tree: main sidebar + settings menu context.
+  // Store Roles read the same single tree as the Store Admin sidebar.
   const rolePermissionTree = [
-    { context: 'main_sidebar', title: 'Main sidebar', children: menuTree },
-    { context: 'settings_menu', title: 'Settings menu', children: settingsMenuTree },
+    { context: 'menu', title: 'Menu', children: menuTree },
   ];
 
   // ---- Account x store access (V1.129) ----
@@ -190,6 +184,6 @@ window.DATA = (function () {
     { v: 10, date: 'Jun 9, 2026', by: 'ryan', kind: 'definition', summary: 'Attribution model set to Last non-direct, click window 30d', recompute: 'Applied to new data only (effective Jun 9)' },
   ];
 
-  return { menuSchema, menuTree, settingsMenuTree, rolePermissionTree, expectedStoreAdminSidebar, accounts, categories,
+  return { menuSchema, menuTree, rolePermissionTree, expectedStoreAdminSidebar, accounts, categories,
     attribution: { domains, channelRules, clickIds, channelPriority, model, session, versions } };
 })();
