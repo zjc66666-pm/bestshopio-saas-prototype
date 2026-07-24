@@ -184,6 +184,64 @@ window.DATA = (function () {
     { v: 10, date: 'Jun 9, 2026', by: 'ryan', kind: 'definition', summary: 'Attribution model set to Last non-direct, click window 30d', recompute: 'Applied to new data only (effective Jun 9)' },
   ];
 
+  // ---- BestCheckout operations: platform-owned connection, sync and reconciliation control plane ----
+  const bestcheckoutOps = {
+    stores: [
+      { id: 'shop_lavender', store: 'Lavender Labs', domain: 'lavender-labs.myshopify.com', shopId: 'bs_store_8f42', install: 'Connected', data: 'Healthy', lastSuccess: '2 min ago', lastAttempt: '2 min ago', funnels: '3 live', payment: '2 routes', writeback: 'Healthy', health: 'Healthy', next: 'No action required', bestshopio: {
+        storeName: 'Lavender Labs Store', merchant: 'Avery Wells', merchantId: 'mer_1042', provisionStatus: 'Completed', storeStatus: 'Active', defaultDomain: 'lavender-labs.stores.bestshopio.com', customDomain: 'lavenderlabs.com', ssl: 'Active', region: 'US', routingVersion: 'v1', createdAt: 'Jun 18, 2026', taskUpdated: 'Jun 18, 2026 09:42'
+      }, readiness: {
+        authorization: { status: 'Connected', value: 'OAuth + Admin API', scopes: 'Products · orders · customers', checked: '2 min ago' },
+        sync: { status: 'Healthy', value: '5 data entities · 5 webhook topics', detail: '5 / 5 delivery checks healthy', checked: '2 min ago' },
+        domain: { status: 'Verified', value: 'checkout.lavenderlabs.com', host: 'checkout', target: 'edge.bestcheckout.app', ssl: 'Active', checked: '2 min ago' },
+        paymentConfig: { status: 'Configured', value: 'Stripe · live mode', methods: 'Cards · Apple Pay · Google Pay', detail: '3 / 3 payment webhooks healthy', checked: '1 min ago' },
+        embed: { status: 'Enabled', value: 'Dawn', detail: 'Cart checkout · Buy it now · Cart drawer', checked: '1 min ago' }
+      } },
+      { id: 'shop_folast', store: 'Folast Studio', domain: 'folast-studio.myshopify.com', shopId: 'bs_store_c901', install: 'Connected', data: 'Review', lastSuccess: '18 min ago', lastAttempt: '11 min ago · webhook retry pending', funnels: '2 live', payment: '1 route', writeback: 'Healthy', health: 'Review', next: 'Resolve 2 variant mappings', bestshopio: {
+        storeName: 'Folast Studio Store', merchant: 'Mia Chen', merchantId: 'mer_1096', provisionStatus: 'Completed', storeStatus: 'Active', defaultDomain: 'folast-studio.stores.bestshopio.com', customDomain: 'folaststudio.com', ssl: 'Active', region: 'US', routingVersion: 'v1', createdAt: 'Jul 02, 2026', taskUpdated: 'Jul 02, 2026 14:18'
+      }, readiness: {
+        authorization: { status: 'Connected', value: 'OAuth + Admin API', scopes: 'Products · orders · customers', checked: '11 min ago' },
+        sync: { status: 'Review', value: '5 data entities · 5 webhook topics', detail: 'Webhook retry is pending', checked: '11 min ago' },
+        domain: { status: 'Verified', value: 'checkout.folast-studio.com', host: 'checkout', target: 'edge.bestcheckout.app', ssl: 'Active', checked: '18 min ago' },
+        paymentConfig: { status: 'Configured', value: 'Airwallex · live mode', methods: 'Cards · Apple Pay', detail: '1 / 1 payment webhooks healthy', checked: '8 min ago' },
+        embed: { status: 'Not detected', value: 'Shrine PRO', detail: 'Theme changed; App Embed is not on the live theme', checked: '17 min ago' }
+      } },
+      { id: 'shop_heyjune', store: 'Hey June', domain: 'hey-june.myshopify.com', shopId: 'bs_store_a715', install: 'Connected', data: 'Healthy', lastSuccess: '5 min ago', lastAttempt: '5 min ago', funnels: '1 live', payment: '1 route', writeback: 'Review', health: 'Review', next: 'Replay 1 order writeback', bestshopio: {
+        storeName: 'Hey June Store', merchant: 'June Park', merchantId: 'mer_1120', provisionStatus: 'Completed', storeStatus: 'Active', defaultDomain: 'hey-june.stores.bestshopio.com', customDomain: 'Not connected', ssl: 'Not configured', region: 'US', routingVersion: 'v1', createdAt: 'Jul 08, 2026', taskUpdated: 'Jul 08, 2026 11:06'
+      }, readiness: {
+        authorization: { status: 'Connected', value: 'OAuth + Admin API', scopes: 'Products · orders · customers', checked: '5 min ago' },
+        sync: { status: 'Healthy', value: '5 data entities · 5 webhook topics', detail: '5 / 5 delivery checks healthy', checked: '5 min ago' },
+        domain: { status: 'Verified', value: 'checkout.heyjune.co', host: 'checkout', target: 'edge.bestcheckout.app', ssl: 'Active', checked: '5 min ago' },
+        paymentConfig: { status: 'Configured', value: 'Stripe · live mode', methods: 'Cards · Link', detail: '2 / 2 payment webhooks healthy', checked: '4 min ago' },
+        embed: { status: 'Enabled', value: 'Sense', detail: 'Cart checkout · Buy it now · Cart drawer', checked: '5 min ago' }
+      } },
+      { id: 'shop_river', store: 'River Remedy', domain: 'river-remedy.myshopify.com', shopId: 'bs_store_d212', install: 'Reauthorization needed', data: 'Paused', lastSuccess: 'Yesterday', lastAttempt: '35 min ago · blocked by authorization', funnels: '0 live', payment: '0 routes', writeback: 'Paused', health: 'Action required', next: 'Ask merchant to reconnect Shopify', bestshopio: {
+        storeName: 'River Remedy Store', merchant: 'Riley Morgan', merchantId: 'mer_1178', provisionStatus: 'Failed', storeStatus: 'Disabled', defaultDomain: 'river-remedy.stores.bestshopio.com', customDomain: 'riverremedy.com', ssl: 'Pending', region: 'US', routingVersion: 'v1', createdAt: 'Jul 15, 2026', taskUpdated: 'Today 08:55'
+      }, readiness: {
+        authorization: { status: 'Reauthorization needed', value: 'OAuth + Admin API', scopes: 'Access token revoked', checked: '35 min ago' },
+        sync: { status: 'Paused', value: 'No new data pulls or webhooks', detail: 'Blocked by authorization', checked: '35 min ago' },
+        domain: { status: 'Not verified', value: 'checkout.riverremedy.com', host: 'checkout', target: 'edge.bestcheckout.app', ssl: 'Pending', checked: 'Yesterday' },
+        paymentConfig: { status: 'Not connected', value: 'No processor connected', methods: 'No payment methods available', detail: 'Credentials are not stored', checked: 'Yesterday' },
+        embed: { status: 'Disabled', value: 'No live theme detected', detail: 'Reconnect Shopify before restoring App Embed', checked: 'Yesterday' }
+      } },
+    ],
+    syncIssues: [
+      { id: 'sync_02', storeId: 'shop_folast', kind: 'Variant mapping', subject: 'Variant 4812 / Sage linen dress', detail: 'The Shopify variant was replaced after the initial import. Existing offer rules cannot resolve it.', firstSeen: '18 min ago', retries: 3, state: 'Action required', action: 'Map replacement' },
+      { id: 'sync_03', storeId: 'shop_folast', kind: 'Webhook delivery', subject: 'products/update · wh_9012', detail: 'The retry budget was exhausted after repeated 429 responses. The event payload is preserved for replay.', firstSeen: '11 min ago', retries: 5, state: 'Retryable', action: 'Replay event' },
+      { id: 'sync_04', storeId: 'shop_river', kind: 'Authorization', subject: 'Shopify access token', detail: 'The merchant revoked the App authorization. New checkout traffic remains on Shopify native control.', firstSeen: 'Yesterday', retries: 0, state: 'Merchant action', action: 'Request reconnection' },
+    ],
+    writebacks: [
+      { id: 'wb_441', storeId: 'shop_heyjune', order: 'BC-10482', shopifyOrder: '#7821', state: 'Retryable', age: '7 min', detail: 'Shopify accepted the idempotency key but the projection acknowledgement timed out.' },
+      { id: 'wb_442', storeId: 'shop_lavender', order: 'BC-10479', shopifyOrder: '#7718', state: 'Completed', age: '2 min', detail: 'Final Order Snapshot projected successfully.' },
+      { id: 'wb_443', storeId: 'shop_folast', order: 'BC-10475', shopifyOrder: '#3184', state: 'Completed', age: '18 min', detail: 'Offer acceptance and order update reconciled.' },
+    ],
+    runtime: [
+      { storeId: 'shop_lavender', surface: 'Hosted Checkout', policy: 'Shopify native control 15%', funnel: 'Sleep Reset', status: 'Healthy' },
+      { storeId: 'shop_folast', surface: 'Hosted Checkout', policy: 'Shopify native control 20%', funnel: 'Seasonal bundle', status: 'Review' },
+      { storeId: 'shop_heyjune', surface: 'Hosted Checkout', policy: 'Shopify native control 10%', funnel: 'Refill recovery', status: 'Healthy' },
+      { storeId: 'shop_river', surface: 'Shopify native only', policy: 'Fallback before payment', funnel: 'No live Funnel', status: 'Paused' },
+    ],
+  };
+
   return { menuSchema, menuTree, rolePermissionTree, expectedStoreAdminSidebar, accounts, categories,
-    attribution: { domains, channelRules, clickIds, channelPriority, model, session, versions } };
+    attribution: { domains, channelRules, clickIds, channelPriority, model, session, versions }, bestcheckoutOps };
 })();
