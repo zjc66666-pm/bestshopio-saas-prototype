@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="BestShopio and BestCheckout">
+  <defs>
+    <linearGradient id="mark" x1="6" y1="2" x2="58" y2="62" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2F7BF0"/>
+      <stop offset="0.48" stop-color="#6A6AF0"/>
+      <stop offset="1" stop-color="#7C4CE2"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#mark)"/>
+  <path fill="#fff" fill-rule="evenodd" d="M19 14.5h16.6c6.2 0 10.3 3.4 10.3 8.7 0 3.4-1.8 6.1-5.2 7.4 4.2 1.2 6.7 4.4 6.7 8.7 0 5.9-4.6 9.8-11.7 9.8H19V14.5zm7 12.8h8.1c3.2 0 5.1-1.7 5.1-4.3s-1.9-4.2-5.1-4.2H26v8.5zm0 16.8h9.1c3.7 0 5.9-2 5.9-5s-2.2-4.9-5.9-4.9H26v9.9z"/>
+</svg>

@@ -61,6 +61,24 @@
   }
 
   // ---------- 1. custom select ----------
+  function fitSelectToOptions(sel, btn) {
+    if (!btn || !btn.isConnected) return;
+    var cs = window.getComputedStyle(btn);
+    var probe = document.createElement('span');
+    probe.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;white-space:nowrap;font:' + cs.font;
+    document.body.appendChild(probe);
+    var max = 0;
+    Array.prototype.forEach.call(sel.options, function (o) {
+      probe.textContent = o.textContent || '';
+      if (probe.offsetWidth > max) max = probe.offsetWidth;
+    });
+    document.body.removeChild(probe);
+    var padL = parseFloat(cs.paddingLeft) || 10;
+    var padR = parseFloat(cs.paddingRight) || 10;
+    var gap = parseFloat(cs.gap || cs.columnGap) || 8;
+    btn.style.width = Math.ceil(max + padL + padR + gap + 14 + 8) + 'px';
+    btn.style.flex = 'none';
+  }
   function enhanceSelect(sel) {
     sel.setAttribute('data-ui', '1');
     var btn = document.createElement('div');
@@ -76,12 +94,20 @@
     sync();
     sel.style.display = 'none';
     sel.parentNode.insertBefore(btn, sel);
+    if (sel.hasAttribute('data-ui-fit')) {
+      fitSelectToOptions(sel, btn);
+      setTimeout(function () { fitSelectToOptions(sel, btn); }, 0);
+    }
 
     btn.onclick = function () {
       if (openLayer && openLayer._owner === btn) { closePop(); return; }
       var panel = document.createElement('div');
       panel.className = 'ui-select-pop';
-      panel.style.minWidth = Math.max(btn.offsetWidth, 160) + 'px';
+      if (sel.hasAttribute('data-ui-match-width')) {
+        panel.style.boxSizing = 'border-box';
+        panel.style.width = btn.offsetWidth + 'px';
+        panel.style.minWidth = '0';
+      } else panel.style.minWidth = Math.max(btn.offsetWidth, 160) + 'px';
       Array.prototype.forEach.call(sel.options, function (o, i) {
         var opt = document.createElement('div');
         opt.className = 'opt' + (i === sel.selectedIndex ? ' sel' : '');

@@ -22,6 +22,24 @@
     return core.ico && core.P && core.P[name] ? core.ico(core.P[name], size || 16) : '';
   }
   function toast(message) { if (pc().toast) pc().toast(message); }
+  function tx(text) { return window.I18N && window.I18N.t ? window.I18N.t(text) : text; }
+  function copyText(value, okMessage) {
+    var text = String(value || '');
+    if (!text) return;
+    function done() { toast(tx(okMessage || 'Copied')); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(function () {
+        var input = document.createElement('input');
+        input.value = text;
+        document.body.appendChild(input);
+        input.select();
+        try { document.execCommand('copy'); done(); } catch (err) {}
+        document.body.removeChild(input);
+      });
+      return;
+    }
+    done();
+  }
   function apply(root) { if (window.I18N && window.I18N.apply) window.I18N.apply(root); }
   function route(hash) { location.hash = hash; }
   function cleanPart(part) { return String(part || '').split('?')[0]; }
@@ -32,23 +50,53 @@
   }
   function statusTone(value) {
     var text = String(value || '').toLowerCase();
-    if (/failed|suspend|action required|blocked|reauthorization|retryable|merchant action|not connected|not verified|disabled/.test(text)) return 'danger';
-    if (/review|pending|progress|waiting|pilot|queued|draft|open/.test(text)) return 'warn';
-    if (/paused|not configured|archived|hidden/.test(text)) return 'muted';
+    if (/preparing install link|正在准备安装链接/.test(text)) return 'action';
+    if (/domain not connected|payment not connected|域名未连接|支付未连接/.test(text)) return 'warn';
+    if (/failed|suspend|action required|needs attention|blocked|reauthorization|retryable|merchant action|not connected|not verified|disabled|expired|install failed/.test(text)) return 'danger';
+    if (/review|pending|provision|progress|waiting|sending to shopify|pilot|queued|draft|open|ready to install|setup incomplete|not completed|开通|opening|未完成/.test(text)) return 'warn';
+    if (/paused|not configured|archived|hidden|none/.test(text)) return 'muted';
     return 'ok';
   }
   function status(value) {
     return '<span class="ops-status ' + statusTone(value) + '"><i></i>' + esc(value || '—') + '</span>';
   }
+  function flowStatus(value) {
+    var state = String(value || '');
+    if (state === 'Review') state = 'Paused';
+    var tone = state === 'Live' ? 'ok' : (state === 'Paused' ? 'warn' : 'muted');
+    return '<span class="ops-status ' + tone + '"><i></i>' + esc(state || '—') + '</span>';
+  }
+  function flowRows(list) {
+    if (!list.length) return listEmpty('No purchase flows in this view.', 7);
+    return list.map(function (flow) {
+      return '<tr><td>' + esc(flow.name) + '</td><td>' + esc(flow.priority != null ? String(flow.priority) : '—') + '</td><td>' + esc(flow.funnelType || '—') + '</td><td>' + esc(flow.traffic || '—') + '</td><td>' + esc(flow.conversion || '—') + '</td><td>' + esc(flow.aov || '—') + '</td><td>' + flowStatus(flow.state) + '</td></tr>';
+    }).join('');
+  }
+  function pagerHtml(pageNo, pageSize, total, pageAttr, sizeId) {
+    var pages = Math.max(1, Math.ceil((total || 0) / pageSize));
+    if (pageNo > pages) pageNo = pages;
+    var html = '<span class="pg-item' + (pageNo <= 1 ? ' disabled' : '') + '"' + (pageNo <= 1 ? '' : ' data-' + pageAttr + '="' + (pageNo - 1) + '"') + '>‹</span>';
+    for (var p = 1; p <= pages; p++) html += '<span class="pg-item' + (p === pageNo ? ' active' : '') + '" data-' + pageAttr + '="' + p + '">' + p + '</span>';
+    html += '<span class="pg-item' + (pageNo >= pages ? ' disabled' : '') + '"' + (pageNo >= pages ? '' : ' data-' + pageAttr + '="' + (pageNo + 1) + '"') + '>›</span>';
+    html += '<select class="pg-size" id="' + sizeId + '" aria-label="Page size"><option value="10"' + (pageSize === 10 ? ' selected' : '') + '>10 / page</option><option value="20"' + (pageSize === 20 ? ' selected' : '') + '>20 / page</option><option value="50"' + (pageSize === 50 ? ' selected' : '') + '>50 / page</option><option value="100"' + (pageSize === 100 ? ' selected' : '') + '>100 / page</option></select>';
+    return { html: html, page: pageNo };
+  }
+  function statusPlain(value) {
+    return '<span class="ops-status-plain">' + esc(value || '—') + '</span>';
+  }
   function linkCell(title, meta, href) {
     return '<a class="ops-row-link" href="' + esc(href) + '"><strong>' + esc(title) + '</strong>' + (meta ? '<span>' + esc(meta) + '</span>' : '') + '</a>';
   }
-  function page(title, sub, actions, body, crumb) {
-    var pageClass = title === 'Help Center' ? ' ops-page-help-center' : title === 'Stores' ? ' ops-page-stores' : '';
+  function page(title, sub, actions, body, crumb, backTo) {
+    var pageClass = title === 'Help Center' ? ' ops-page-help-center' : (title === 'Stores' ? ' ops-page-stores' : (backTo === '#/stores' ? ' ops-page-store-detail' : ''));
+    var titleBlock = '<div class="ops-page-title-block"><h1 class="ops-title page-title">' + esc(title) + '</h1>' +
+      (sub ? '<div class="ops-sub">' + esc(sub) + '</div>' : '') + '</div>';
+    var titleRow = backTo
+      ? '<div class="ops-page-title-row"><a class="back-btn" href="' + esc(backTo) + '" title="Back" aria-label="Back">' + icon('arrowLeft', 18) + '</a>' + titleBlock + '</div>'
+      : titleBlock;
     return '<section class="ops-page' + pageClass + '">' +
-      (crumb ? '<div class="ops-breadcrumb">' + crumb + '</div>' : '') +
-      '<header class="ops-page-head"><div><h1 class="ops-title page-title">' + esc(title) + '</h1>' +
-      (sub ? '<div class="ops-sub">' + esc(sub) + '</div>' : '') + '</div>' +
+      (!backTo && crumb ? '<div class="ops-breadcrumb">' + crumb + '</div>' : '') +
+      '<header class="ops-page-head"><div>' + titleRow + '</div>' +
       (actions ? '<div class="ops-head-actions">' + actions + '</div>' : '') + '</header>' + body + '</section>';
   }
   function render(root, html, bind) {
@@ -59,7 +107,38 @@
   function back(to, text) { return '<a href="' + esc(to) + '">' + esc(text) + '</a><span>/</span>'; }
   function fact(label, value) { return '<div class="ops-fact"><span>' + esc(label) + '</span><strong>' + value + '</strong></div>'; }
   function kpi(label, value, detail, tone) {
-    return '<div class="ops-kpi' + (tone ? ' ' + tone : '') + '"><span>' + esc(label) + '</span><strong>' + esc(value) + '</strong><small>' + esc(detail) + '</small></div>';
+    return kpiHtml(label, value, detail ? esc(detail) : '', tone);
+  }
+  function kpiHtml(label, value, detailHtml, tone) {
+    return '<div class="ops-kpi' + (tone ? ' ' + tone : '') + '"><span>' + esc(label) + '</span><strong>' + esc(value) + '</strong>' + (detailHtml ? '<small>' + detailHtml + '</small>' : '') + '</div>';
+  }
+  function catalogKpi(labelEn, labelZh, value, detailHtml) {
+    var label = (window.I18N && window.I18N.lang === 'zh') ? labelZh : labelEn;
+    return '<div class="ops-kpi"><span class="i18n-skip">' + esc(label) + '</span><strong>' + esc(value) + '</strong>' + (detailHtml ? '<small>' + detailHtml + '</small>' : '') + '</div>';
+  }
+  function kpiCountNote(count, label, tone) {
+    var cls = tone === 'danger' ? 'ops-count-alert' : '';
+    return '<span class="i18n-skip' + (cls ? ' ' + cls : '') + '">' + esc(count) + '</span> <span' + (cls ? ' class="' + cls + '"' : '') + '>' + esc(label) + '</span>';
+  }
+  function unsyncedCount(total, synced) {
+    var gap = Number(total) - Number(synced);
+    return isFinite(gap) && gap > 0 ? gap : 0;
+  }
+  function orderSyncNote(usage) {
+    var note = kpiCountNote(usage.ordersSynced, 'already synced');
+    var gap = unsyncedCount(usage.ordersTotal, usage.ordersSynced);
+    if (gap) note += '<span> · </span>' + kpiCountNote(gap, 'not synced', 'danger');
+    return note;
+  }
+  function contractNote(usage) {
+    var active = Number(usage.contractsActive != null ? usage.contractsActive : usage.contracts) || 0;
+    var due = Number(usage.contractsPastDue || 0);
+    var cancelled = Number(usage.contractsCancelled || 0);
+    function part(count, label, tone) {
+      var cls = tone === 'danger' ? ' ops-count-alert' : '';
+      return '<span' + (cls ? ' class="' + cls.trim() + '"' : '') + '>' + esc(count + ' ' + label) + '</span>';
+    }
+    return part(active, 'Active') + '<span> · </span>' + part(due, 'Past due', due ? 'danger' : '') + '<span> · </span>' + part(cancelled, 'Cancelled');
   }
   function confirmDialog(title, copy, primary, onConfirm, tone) {
     if (!pc().modal) return;
@@ -73,8 +152,89 @@
     if (input) input.oninput = draw;
     (selectIds || []).forEach(function (id) { var el = root.querySelector(id); if (el) el.onchange = draw; });
   }
-  function listEmpty(message) {
-    return '<tr><td colspan="8"><div class="ops-empty"><strong>No matching records</strong><p>' + esc(message) + '</p></div></td></tr>';
+  function listEmpty(message, cols) {
+    return '<tr class="ops-empty-row"><td class="muted ops-table-empty" colspan="' + (cols || 6) + '">' + esc(message) + '</td></tr>';
+  }
+  function fitMultiFilter(filter) {
+    if (!filter) return;
+    var button = filter.querySelector('.ops-multi-trigger');
+    var popover = filter.querySelector('.ops-multi-popover');
+    if (!button || !popover) return;
+    var cs = window.getComputedStyle(button);
+    var probe = document.createElement('span');
+    probe.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;white-space:nowrap;font:' + cs.font;
+    document.body.appendChild(probe);
+    var maxText = 0;
+    filter.querySelectorAll('.ops-multi-sizer span, .ops-multi-trigger span, .ops-multi-popover label span').forEach(function (el) {
+      probe.textContent = el.textContent || '';
+      if (probe.offsetWidth > maxText) maxText = probe.offsetWidth;
+    });
+    document.body.removeChild(probe);
+    var pad = parseFloat(cs.paddingLeft) || 10;
+    var gap = parseFloat(cs.columnGap || cs.gap) || 8;
+    var icon = 14;
+    var triggerNeed = maxText + pad + pad + gap + icon;
+    var popNeed = maxText + 12 + 20 + 15 + 8;
+    var width = Math.ceil(Math.max(triggerNeed, popNeed));
+    filter.style.width = width + 'px';
+    popover.style.boxSizing = 'border-box';
+    popover.style.width = width + 'px';
+    popover.style.minWidth = width + 'px';
+    popover.style.maxWidth = width + 'px';
+  }
+  function multiCheckHtml(id, empty, options) {
+    var sizer = [empty].concat(options.map(function (opt) { return opt.label; })).map(function (text) {
+      return '<span>' + esc(text) + '</span>';
+    }).join('');
+    return '<div class="ops-multi-filter" id="' + id + 'Filter">' +
+      '<span class="ops-multi-sizer" aria-hidden="true">' + sizer + '</span>' +
+      '<button type="button" class="filter-select ops-multi-trigger" id="' + id + 'Button"><span id="' + id + 'Label">' + esc(empty) + '</span>' + icon('down', 14) + '</button>' +
+      '<div class="ops-multi-popover" id="' + id + 'Popover">' + options.map(function (opt) {
+        return '<label><input type="checkbox" value="' + esc(opt.value) + '"><span>' + esc(opt.label) + '</span></label>';
+      }).join('') + '</div></div>';
+  }
+  function bindMultiCheck(scope, id, empty, options, selected, onChange, shared) {
+    var filter = scope.querySelector('#' + id + 'Filter');
+    var button = scope.querySelector('#' + id + 'Button');
+    var popover = scope.querySelector('#' + id + 'Popover');
+    var label = scope.querySelector('#' + id + 'Label');
+    var sizer = filter ? filter.querySelector('.ops-multi-sizer') : null;
+    function paint() {
+      if (!label || !button || !popover) return;
+      var text = !selected.length ? empty : (selected.length === 1 ? ((options.filter(function (opt) { return opt.value === selected[0]; })[0] || {}).label || selected[0]) : selected.length + ' selected');
+      label.textContent = text;
+      popover.querySelectorAll('input').forEach(function (input) {
+        input.checked = selected.indexOf(input.value) >= 0;
+      });
+      var isOpen = shared.open === id;
+      popover.classList.toggle('show', isOpen);
+      button.classList.toggle('active', isOpen || selected.length > 0);
+      if (window.I18N && window.I18N.apply) {
+        window.I18N.apply(button);
+        window.I18N.apply(popover);
+        if (sizer) window.I18N.apply(sizer);
+      }
+      fitMultiFilter(filter);
+    }
+    button.onclick = function (event) {
+      event.stopPropagation();
+      shared.open = shared.open === id ? '' : id;
+      if (shared.paintAll) shared.paintAll();
+    };
+    popover.querySelectorAll('input').forEach(function (input) {
+      input.onchange = function () {
+        var value = input.value;
+        if (input.checked) {
+          if (selected.indexOf(value) < 0) selected.push(value);
+        } else {
+          selected.splice(selected.indexOf(value), 1);
+        }
+        onChange();
+        paint();
+      };
+    });
+    shared.painters.push(paint);
+    return paint;
   }
   function modalFields(title, fields, primary, onSave) {
     var body = fields.map(function (field) {
@@ -149,63 +309,811 @@
   }
 
   /* ---------- Stores and merchant organizations ---------- */
-  function storeRows(list) {
-    if (!list.length) return listEmpty('Try a different store name, product or lifecycle filter.');
-    return list.map(function (item) {
-      var health = item.connection === 'Healthy' && item.domainHealth === 'Healthy' ? 'Healthy' : item.connection === 'Action required' ? 'Action required' : 'Review';
-      return '<tr><td style="width:25%">' + linkCell(item.name, item.organization + ' · ' + item.region, '#/stores/' + item.id) + '</td><td class="hide-md">' + esc(item.product) + '</td><td class="hide-sm">' + esc(item.plan) + '</td><td>' + status(item.lifecycle) + '</td><td class="hide-sm">' + status(health) + '</td><td class="hide-xs"><span class="ops-meta">' + esc(item.nextAction) + '</span></td><td><a class="ops-link" href="#/stores/' + esc(item.id) + '">View</a></td></tr>';
+  function installLabel(code) {
+    return ({
+      preparing: 'Preparing install link',
+      ready: 'Ready to install',
+      expired: 'Install link expired',
+      failed: 'Install failed',
+      connected: 'Connected',
+      reauth: 'Reauthorization needed'
+    })[code] || code || '—';
+  }
+  function findInstall(storeId) {
+    return (B.installs || []).filter(function (item) { return item.storeId === storeId; })[0] || null;
+  }
+  function installCode(item) {
+    return item.installStatus || '';
+  }
+  function isShopifyConnected(item) {
+    var code = installCode(item);
+    return code === 'connected' || code === 'reauth';
+  }
+  function storeInstall(item) {
+    if (item.type !== 'bestcheckout' && !installCode(item)) return '';
+    return installLabel(installCode(item) || 'preparing');
+  }
+  function storeSetup(item) {
+    var connected = item.type !== 'bestcheckout' || isShopifyConnected(item);
+    var domain = item.domainSetup || (item.domainHealth === 'Healthy' ? 'Verified' : 'Pending');
+    var payment = item.paymentSetup || 'Not connected';
+    var checks = [
+      { key: 'domain', short: 'Domain check', name: 'Domain verification', status: domain, ok: domain === 'Verified' },
+      { key: 'payment', short: 'Payment check', name: 'Payment configuration', status: payment, ok: payment === 'Configured' }
+    ];
+    if (!connected) return { label: '', available: false, checks: checks, missing: checks };
+    var missing = checks.filter(function (check) { return !check.ok; });
+    var label = !missing.length ? 'Ready' : (missing.length === 1 ? (missing[0].key === 'domain' ? 'Domain pending' : 'Payment pending') : 'Setup incomplete');
+    return { label: label, available: true, checks: checks, missing: missing };
+  }
+  function setupCheckLabel(check) {
+    var name = check.key === 'payment' ? 'Payment' : 'Domain';
+    return name + (check.ok ? ' connected' : ' not connected');
+  }
+  function storeSetupTags(setup) {
+    return '<div class="ops-setup-tags">' + setup.checks.map(function (check) {
+      return status(setupCheckLabel(check));
+    }).join('') + '</div>';
+  }
+  function uniqueNames(list) {
+    var seen = {};
+    return (list || []).filter(function (name) {
+      var key = String(name || '').toLowerCase();
+      if (!key || seen[key]) return false;
+      seen[key] = true;
+      return true;
+    });
+  }
+  function storeConnectedDomains(item) {
+    var setup = storeSetup(item);
+    var domainCheck = setup.checks.filter(function (check) { return check.key === 'domain'; })[0];
+    if (!domainCheck || !domainCheck.ok) return [];
+    var usage = item.type === 'bestcheckout' ? 'checkout' : 'storefront';
+    var hosts = (C.hosts || []).filter(function (host) {
+      return host.storeId === item.id && host.usage === usage && (host.dns === 'Verified' || host.status === 'Live');
+    }).map(function (host) { return host.host; });
+    if (item.type !== 'bestcheckout') {
+      var defaultHost = String(storeDefaultHost(item) || '').toLowerCase();
+      hosts = hosts.filter(function (host) {
+        return String(host).toLowerCase() !== defaultHost && !/\.stores\.bestshopio\.com$/i.test(host);
+      });
+      var primary = storePrimaryHost(item);
+      if (primary) {
+        hosts = [primary].concat(hosts.filter(function (host) {
+          return String(host).toLowerCase() !== String(primary).toLowerCase();
+        }));
+      }
+      return uniqueNames(hosts);
+    }
+    if (hosts.length) return uniqueNames(hosts);
+    if (item.primaryDomain) return [item.primaryDomain];
+    var ops = ((D.bestcheckoutOps && D.bestcheckoutOps.stores) || []).filter(function (row) { return row.id === item.id; })[0];
+    var readyHost = ops && ops.readiness && ops.readiness.domain;
+    if (readyHost && readyHost.status === 'Verified' && readyHost.value) return [readyHost.value];
+    return [];
+  }
+  function storePayments(item) {
+    var pay = item.payments || {};
+    return {
+      configured: uniqueNames(pay.configured || []),
+      active: uniqueNames(pay.active || [])
+    };
+  }
+  function storePaymentText(values) {
+    return values.length ? values.map(function (name) { return '<span class="i18n-skip">' + esc(name) + '</span>'; }).join('<span class="ops-hero-sep"> · </span>') : '<span>—</span>';
+  }
+  function storeOverviewHosts(values, item) {
+    return values.map(function (host) {
+      return item ? storePreviewLink(item, host) : '<span class="i18n-skip">' + esc(host) + '</span>';
+    }).join('<span class="ops-hero-sep"> · </span>');
+  }
+  function statusOrDash(value) {
+    return value ? status(value) : '<span class="ops-meta">—</span>';
+  }
+  function storeUsage(item) {
+    return (C.storeOps && C.storeOps[item.id]) || null;
+  }
+  function bcSyncItems(status, note) {
+    return [
+      { name: 'Products, variants & inventory', status: status, note: note },
+      { name: 'Collections', status: status, note: note },
+      { name: 'Customers', status: status, note: note },
+      { name: 'Discounts', status: status, note: note },
+      { name: 'Shipping rates', status: status, note: note },
+      { name: 'Store settings', status: status, note: note },
+      { name: 'Subscriptions', status: status, note: note },
+      { name: 'Order writeback', status: status, note: note }
+    ];
+  }
+  function emptyBsUsage() {
+    return {
+      kind: 'bestshopio',
+      products: 0, productsLive: 0,
+      collections: 0, collectionsPublished: 0,
+      customers: 0,
+      discounts: 0, discountsActive: 0,
+      reviews: 0, reviewsPending: 0,
+      ordersTotal: 0, orders7d: 0,
+      gmv: '$0', aov: '$0'
+    };
+  }
+  function emptyBcUsage(connected) {
+    var status = connected ? 'Pending' : 'Waiting';
+    var note = connected ? 'No data yet' : 'Starts after the store is connected';
+    return {
+      kind: 'bestcheckout',
+      flowsTotal: 0, flowsActive: 0, pagesTotal: 0, pagesActive: 0,
+      bundlesTotal: 0, bundlesActive: 0, subsTotal: 0, subsSynced: 0, subsCreated: 0,
+      contracts: 0, contractsActive: 0, contractsPastDue: 0, contractsCancelled: 0,
+      ordersTotal: 0, ordersSynced: 0, gmv: '$0', aov: '$0',
+      flows: [],
+      syncStatus: status,
+      syncNote: 'Shopify catalog pull and order writeback',
+      syncChecked: '',
+      syncItems: bcSyncItems(status, note)
+    };
+  }
+  function detailUsage(record) {
+    return storeUsage(record) || (record.type === 'bestcheckout' ? emptyBcUsage(isShopifyConnected(record)) : emptyBsUsage());
+  }
+  function opsStamp(ms) {
+    var d = new Date(isFinite(ms) ? ms : opsNow());
+    var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    var hh = d.getHours();
+    var mm = d.getMinutes();
+    return months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear() + ' ' + (hh < 10 ? '0' : '') + hh + ':' + (mm < 10 ? '0' : '') + mm;
+  }
+  function expireStamp(fromMs) {
+    return opsStamp((isFinite(fromMs) ? fromMs : opsNow()) + 7 * 24 * 3600000);
+  }
+  function fallbackInstallLink(record) {
+    var shop = String((record && record.shopify) || '').replace(/\.myshopify\.com$/i, '');
+    if (!shop || shop === '--') return '';
+    return 'https://admin.shopify.com/store/' + shop + '/oauth/install_custom_app?client_id=8f2c91a0b47d3e6c5a19d80e4b27c3f1&redirect_uri=https%3A%2F%2Fapp.bestcheckout.com%2Fshopify%2Fcallback';
+  }
+  function storeInstallLink(record, install) {
+    if (install && install.installLink) return install.installLink;
+    if (record && record.installLink) return record.installLink;
+    var code = installCode(record) || (install && install.status) || '';
+    if (!code || code === 'preparing') return '';
+    return fallbackInstallLink(record);
+  }
+  function installLinkAction(code) {
+    if (code === 'preparing') return 'Enter install link';
+    if (code === 'expired' || code === 'failed') return 'Edit install link';
+    return '';
+  }
+  function ensureInstall(record) {
+    var item = findInstall(record.id);
+    if (item) return item;
+    item = {
+      id: 'bc_install_' + String(record.id || '').replace(/^shop_/, ''),
+      storeId: record.id,
+      shop: record.shopify || '',
+      status: installCode(record) || 'preparing',
+      submittedAt: record.createdAt || '',
+      linkSentAt: '',
+      expiresAt: '',
+      owner: 'Commerce ops',
+      next: record.nextAction || '',
+      installLink: record.installLink || ''
+    };
+    B.installs = B.installs || [];
+    B.installs.push(item);
+    return item;
+  }
+  function validateInstallLink(value) {
+    var link = String(value || '').trim();
+    if (!link) return 'Enter the install link.';
+    try {
+      var parsed = new URL(link);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return 'Enter a valid install link.';
+    } catch (err) {
+      return 'Enter a valid install link.';
+    }
+    return '';
+  }
+  function applyInstallLink(record, link, rerender) {
+    var item = ensureInstall(record);
+    var sentAt = opsStamp(opsNow());
+    item.installLink = link;
+    item.status = 'ready';
+    item.linkSentAt = sentAt;
+    item.expiresAt = expireStamp(opsNow());
+    item.next = 'Waiting for merchant to install';
+    syncInstallToStore(item);
+    record.installLink = link;
+    record.onboarding = record.onboarding || {};
+    if (!record.onboarding.createdAt) record.onboarding.createdAt = record.createdAt || sentAt;
+    record.onboarding.linkSentAt = sentAt;
+    audit('Sent install link', record.name, 'Ready to install');
+    toast('Install link emailed to the store.');
+    if (rerender) rerender();
+  }
+  function installEmailKind(code) {
+    return (code === 'expired' || code === 'failed') ? 'renew' : 'first';
+  }
+  function installEmailPreviewHref(record, kind, link) {
+    var query = 'store=' + encodeURIComponent(record.id) + '&kind=' + encodeURIComponent(kind || 'first');
+    if (link) query += '&link=' + encodeURIComponent(link);
+    return location.pathname + location.search + '#/install-email-preview?' + query;
+  }
+  function shopifyDomain(record) {
+    var shop = String((record && record.shopify) || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    if (shop && shop !== '--') return shop;
+    return 'your-store.myshopify.com';
+  }
+  function installEmailPreview(root, query) {
+    var params = query || {};
+    var record = findStore(params.store) || {};
+    var install = findInstall(record.id);
+    var kind = params.kind === 'renew' ? 'renew' : 'first';
+    var link = String(params.link || storeInstallLink(record, install) || fallbackInstallLink(record) || 'https://');
+    var email = storeEmail(record) || 'store@example.com';
+    var domain = shopifyDomain(record);
+    var isRenew = kind === 'renew';
+    var subject = isRenew ? ('Your new BestCheckout install link for ' + domain) : ('Install BestCheckout on ' + domain);
+    var title = isRenew ? 'Your previous install link has expired' : 'Install BestCheckout on your Shopify store';
+    var lead = isRenew
+      ? 'Shopify install links are valid for 7 days. The previous link for <b class="i18n-skip">' + esc(domain) + '</b> can no longer be used. This is the new install link. Open it with the <b>store owner</b> account for this shop.'
+      : 'Your install link for <b class="i18n-skip">' + esc(domain) + '</b> is ready. Open it with the <b>store owner</b> account for this shop.';
+    var expiry = 'This install link expires in 7 days. Please install it as soon as possible.';
+    var note = isRenew
+      ? 'Do not use the old email or the expired link. Do not open this while signed into a different Shopify store.'
+      : 'Do not open this while signed into a different Shopify store.';
+    var context = isRenew
+      ? 'Prototype-only · replacement install email after the previous link expired.'
+      : 'Prototype-only · install email sent after BestCheckout prepares the Custom App.';
+    var arrow = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>';
+    root.innerHTML =
+      '<div class="verification-email-page">' +
+        '<main class="verification-email-wrap">' +
+          '<p class="verification-email-context">' + esc(context) + '</p>' +
+          '<section class="verification-email-inbox" aria-label="Email metadata">' +
+            '<p><span>From</span><b>BestCheckout</b> <small>&lt;no-reply@bestcheckout.com&gt;</small></p>' +
+            '<p><span>To</span><b class="i18n-skip">' + esc(email) + '</b></p>' +
+            '<p><span>Subject</span><b>' + esc(subject) + '</b></p>' +
+          '</section>' +
+          '<section class="verification-email-stage">' +
+            '<article class="verification-email-card">' +
+              '<div class="verification-email-bar"></div>' +
+              '<header><div class="verification-email-brand"><img src="assets/bestcheckout-brand-mark.svg?v=20260908-bcmark1" alt="" aria-hidden="true"/><strong>BestCheckout</strong></div></header>' +
+              '<main>' +
+                '<h1>' + esc(title) + '</h1>' +
+                '<p class="verification-email-lead">' + lead + '</p>' +
+                '<p class="verification-email-lead">' + esc(expiry) + '</p>' +
+                '<div class="connect-form-actions verification-email-install-actions">' +
+                  '<a class="portal-submit" href="' + esc(link) + '" target="_blank" rel="noopener">Install <span class="i18n-skip">' + esc(domain) + '</span> ' + arrow + '</a>' +
+                '</div>' +
+                '<p class="verification-email-note">' + esc(note) + '</p>' +
+              '</main>' +
+              '<footer><p>This is an automated message from BestCheckout — please don’t reply.</p><small>© 2026 BestCheckout</small></footer>' +
+            '</article>' +
+          '</section>' +
+        '</main>' +
+      '</div>';
+    document.title = subject;
+    apply(root);
+  }
+  function openInstallLinkModal(record, rerender) {
+    if (!pc().modal) return;
+    var item = findInstall(record.id);
+    var code = installCode(record) || (item && item.status) || 'preparing';
+    var current = storeInstallLink(record, item);
+    var isEdit = code === 'expired' || code === 'failed';
+    var kind = installEmailKind(code);
+    pc().modal(
+      '<div class="modal-head">' + esc(isEdit ? 'Edit install link' : 'Enter install link') + '</div>' +
+      '<div class="modal-body">' +
+        '<label class="fld-label required">Installation link</label>' +
+        '<input class="input" id="opsInstallLink" value="' + esc(isEdit ? current : '') + '" placeholder="https://">' +
+        '<div class="sh-fld-error" id="opsInstallLinkError" hidden></div>' +
+        '<p class="pcx-modal-copy" style="margin-top:10px">Shopify Custom App install links last 7 days. We will email this link to the store.</p>' +
+        '<a class="ops-preview-email" id="opsPreviewEmail" href="' + esc(installEmailPreviewHref(record, kind, isEdit ? current : '')) + '" target="_blank" rel="noopener">Preview email</a>' +
+      '</div>' +
+      '<div class="modal-foot"><button type="button" class="btn btn-default" data-mx>Cancel</button><button type="button" class="btn btn-primary" id="opsSave">' + esc(isEdit ? 'Save and send' : 'Send email') + '</button></div>',
+      function (layer) {
+        var input = layer.querySelector('#opsInstallLink');
+        var error = layer.querySelector('#opsInstallLinkError');
+        var preview = layer.querySelector('#opsPreviewEmail');
+        function syncPreview() {
+          preview.href = installEmailPreviewHref(record, kind, input.value.trim() || (isEdit ? current : ''));
+        }
+        input.oninput = function () {
+          input.classList.remove('has-error');
+          error.hidden = true;
+          error.textContent = '';
+          syncPreview();
+        };
+        layer.querySelector('#opsSave').onclick = function () {
+          var message = validateInstallLink(input.value);
+          if (message) {
+            error.hidden = false;
+            error.textContent = message;
+            apply(error);
+            input.classList.add('has-error');
+            input.focus();
+            return;
+          }
+          applyInstallLink(record, input.value.trim(), function () {
+            layer.remove();
+            rerender();
+          });
+        };
+      }
+    );
+  }
+  function installLinkFact(record, install) {
+    var link = storeInstallLink(record, install);
+    var code = installCode(record) || (install && install.status) || '';
+    var action = installLinkAction(code);
+    var value = link
+      ? '<span class="ops-install-link i18n-skip">' + esc(link) + '</span><button type="button" class="ops-install-copy" data-copy-install-link="' + esc(link) + '" title="Copy installation link" aria-label="Copy installation link">' + icon('copy', 12) + '</button>'
+      : '<span>—</span>';
+    var button = action
+      ? '<button type="button" class="btn ' + (code === 'preparing' ? 'btn-primary' : 'btn-default') + ' ops-install-link-btn" data-install-link="' + esc(record.id) + '">' + esc(action) + '</button>'
+      : '';
+    return '<div class="ops-install-fact"><span>Installation link</span><strong class="ops-install-value">' + value + '</strong>' + button + '</div>';
+  }
+  function installView(record, install) {
+    var board = record.onboarding || {};
+    return {
+      id: (install && install.id) || '',
+      status: (install && install.status) || installCode(record) || 'preparing',
+      submittedAt: (install && install.submittedAt) || record.createdAt || '—',
+      linkSentAt: (install && install.linkSentAt) || board.linkSentAt || '',
+      expiresAt: (install && install.expiresAt) || ''
+    };
+  }
+  function storeHandle(name) {
+    return String(name || 'store').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'store';
+  }
+  function storeDefaultHost(item) {
+    return item.defaultDomain || (storeHandle(item.name) + '.stores.bestshopio.com');
+  }
+  function isStorefrontConnected(host) {
+    return host && host.usage === 'storefront' && host.dns !== 'Pending' && (host.status === 'Live' || host.dns === 'Verified');
+  }
+  function storePrimaryHost(item) {
+    var found = (C.hosts || []).filter(function (host) {
+      return host.storeId === item.id && isStorefrontConnected(host) && !/\.stores\.bestshopio\.com$/i.test(host.host);
+    })[0];
+    if (found) return found.host;
+    if (item.primaryDomain && item.domainSetup === 'Verified') return item.primaryDomain;
+    return '';
+  }
+  function storeSource(item) {
+    if (item.type === 'bestcheckout') return (item.shopify && item.shopify !== '--') ? item.shopify : 'Shopify';
+    return storePrimaryHost(item) || storeDefaultHost(item);
+  }
+  function hostPreviewUrl(host) {
+    if (!host || host === 'Shopify' || host === 'BestShopio' || host === '--') return '';
+    return /^https?:\/\//i.test(host) ? host : 'https://' + host;
+  }
+  function storePreviewUrl(item) {
+    return hostPreviewUrl(storeSource(item));
+  }
+  function storePreviewLink(item, label) {
+    var host = label || storeSource(item);
+    var url = hostPreviewUrl(host);
+    if (!url) return host ? '<span>' + esc(host) + '</span>' : '';
+    return '<a class="ops-store-preview" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer" title="Open store" aria-label="Open store"><span>' + esc(host) + '</span>' + icon('external', 12) + '</a>';
+  }
+  function storeShopId(item) {
+    return item.shopId || '';
+  }
+  function storeEmail(item) {
+    var org = findOrganization(item.organizationId);
+    return (org && org.email) || item.email || '';
+  }
+  function storeNameCell(item) {
+    var shopId = storeShopId(item);
+    return '<div class="ops-store-cell"><a class="ops-row-link" href="#/stores/' + esc(item.id) + '"><strong>' + esc(item.name) + '</strong></a>' + storePreviewLink(item) + (shopId ? '<span class="ops-store-id" data-copy-shopid="' + esc(shopId) + '" title="Copy Shop ID" role="button"><span class="ops-store-id-text"><span>Shop ID</span>: <span class="i18n-skip">' + esc(shopId) + '</span></span><button type="button" class="ops-store-id-copy" data-copy-shopid="' + esc(shopId) + '" title="Copy Shop ID" aria-label="Copy Shop ID">' + icon('copy', 12) + '</button></span>' : '') + '</div>';
+  }
+  function storeStatusLabel(code) {
+    return ({ Active: 'Enabled', Provisioning: 'Opening', Suspended: 'Disabled' })[code] || code || '—';
+  }
+  function onboardAt(record, key, install) {
+    var board = record.onboarding || {};
+    if (key === 'linkSentAt') return board.linkSentAt || (install && install.linkSentAt) || '';
+    return board[key] || '';
+  }
+  function parseOpsDate(value) {
+    var ms = Date.parse(value);
+    return isFinite(ms) ? ms : 0;
+  }
+  function opsNow() {
+    return Date.parse('Sep 8, 2026 14:30');
+  }
+  function formatOpsDate(value) {
+    if (!value) return '—';
+    return String(value).replace(/\s+\d{1,2}:\d{2}$/, '').trim();
+  }
+  function spanHours(fromValue, toValue) {
+    var from = parseOpsDate(fromValue);
+    var to = toValue ? parseOpsDate(toValue) : opsNow();
+    if (!from || !to) return 0;
+    return Math.round((to - from) / 3600000);
+  }
+  function spanLabel(fromValue, toValue) {
+    var hours = Math.abs(spanHours(fromValue, toValue));
+    if (hours <= 0) return 'Same day';
+    if (hours < 24) return hours === 1 ? '1 hour' : (hours + ' hours');
+    var days = Math.round(hours / 24);
+    if (days === 1) return '1 day';
+    return days + ' days';
+  }
+  function lastDatedStep(steps, beforeIndex) {
+    for (var i = beforeIndex; i >= 0; i--) {
+      if (steps[i] && steps[i].at) return steps[i];
+    }
+    return null;
+  }
+  function isDomainSkipped(steps, step) {
+    if (step.key !== 'domain' || step.at) return false;
+    var payment = steps.filter(function (item) { return item.key === 'payment'; })[0];
+    var order = steps.filter(function (item) { return item.key === 'order'; })[0];
+    return !!(payment && payment.at && order && order.at);
+  }
+  function openLabel(fromValue) {
+    var hours = Math.max(0, spanHours(fromValue));
+    if (hours < 24) return hours === 1 ? '1 hour' : (hours + ' hours');
+    var days = Math.round(hours / 24);
+    if (days === 1) return '1 day';
+    return days + ' days';
+  }
+  function waitingLabel(fromValue) {
+    var hours = Math.max(0, spanHours(fromValue));
+    if (hours < 24) return hours === 1 ? 'Waiting 1 hour' : ('Waiting ' + hours + ' hours');
+    var days = Math.round(hours / 24);
+    return days === 1 ? 'Waiting 1 day' : ('Waiting ' + days + ' days');
+  }
+  function bindPair(payment, domain) {
+    var payAt = parseOpsDate(payment.at);
+    var domainAt = parseOpsDate(domain.at);
+    if (domainAt && (!payAt || domainAt < payAt)) return [domain, payment];
+    return [payment, domain];
+  }
+  function onboardSteps(record, install) {
+    var createdStep = { key: 'created', label: 'Store created', at: onboardAt(record, 'createdAt') || record.createdAt || '' };
+    var payment = { key: 'payment', label: 'Payment bound', at: onboardAt(record, 'paymentBoundAt') };
+    var domain = { key: 'domain', label: record.type === 'bestcheckout' ? 'Checkout domain bound' : 'Storefront domain bound', at: onboardAt(record, 'domainBoundAt') };
+    var binds = bindPair(payment, domain);
+    var order = { key: 'order', label: 'First order received', at: onboardAt(record, 'firstOrderAt') };
+    if (record.type !== 'bestcheckout') return [createdStep].concat(binds, [order]);
+    return [
+      createdStep,
+      { key: 'link', label: 'Install link sent', at: onboardAt(record, 'linkSentAt', install) },
+      { key: 'installed', label: 'Installation complete', at: onboardAt(record, 'installedAt') }
+    ].concat(binds, [order]);
+  }
+  function onboardState(record, install) {
+    var steps = onboardSteps(record, install);
+    var current = -1;
+    steps.forEach(function (step, index) {
+      if (step.at) step.tone = 'done';
+      else if (isDomainSkipped(steps, step)) step.tone = 'skipped';
+      else if (current < 0) { step.tone = 'current'; current = index; }
+      else step.tone = 'wait';
+    });
+    var firstAt = steps[0] && steps[0].at;
+    var last = steps[steps.length - 1];
+    var summary = '';
+    if (last && last.at && firstAt) {
+      summary = '<div class="ops-onboard-summary"><span>Store created → first order</span><strong>' + esc(spanLabel(firstAt, last.at)) + '</strong></div>';
+    } else if (firstAt) {
+      summary = '<div class="ops-onboard-summary"><span>Open for</span><strong>' + esc(openLabel(firstAt)) + '</strong></div>';
+    }
+    return { steps: steps, summary: summary };
+  }
+  function onboardPanel(record, install) {
+    var state = onboardState(record, install);
+    var steps = state.steps;
+    var track = steps.map(function (step, index) {
+      var next = steps[index + 1];
+      var dateText = step.tone === 'skipped' ? 'Default domain' : formatOpsDate(step.at);
+      var dateHtml = step.tone === 'skipped'
+        ? '<span>' + esc(dateText) + '</span>'
+        : '<span class="i18n-skip">' + esc(dateText) + '</span>';
+      var node = '<div class="ops-onboard-step is-' + step.tone + '"><strong>' + esc(step.label) + '</strong><i></i>' + dateHtml + '</div>';
+      if (!next) return node;
+      var gapCls = 'ops-onboard-gap';
+      var gapText = '';
+      if (step.at && next.at) {
+        gapCls += ' is-done';
+        gapText = spanLabel(step.at, next.at);
+      } else if (next.tone === 'skipped' && step.at) {
+        gapCls += ' is-skip';
+      } else if (step.tone === 'skipped' && next.at) {
+        var prev = lastDatedStep(steps, index - 1);
+        gapCls += ' is-done';
+        if (prev) gapText = spanLabel(prev.at, next.at);
+      } else if (step.at && !next.at) {
+        gapCls += ' is-wait';
+        gapText = waitingLabel(step.at);
+      } else {
+        gapCls += ' is-empty';
+      }
+      return node + '<div class="' + gapCls + '"><span>' + (gapText ? esc(gapText) : '') + '</span><b></b></div>';
     }).join('');
+    return '<section class="ops-panel ops-onboard"><div class="ops-panel-head"><div class="ops-onboard-head"><div class="ops-onboard-title-row"><div class="ops-panel-title">Onboarding</div>' + state.summary + '</div><div class="ops-panel-sub">Where setup is stuck, and how long each step took.</div></div></div><div class="ops-panel-body ops-onboard-body"><div class="ops-onboard-scroll"><div class="ops-onboard-track">' + track + '</div></div></div></section>';
   }
-  function createStore(root) {
-    modalFields('Create store record', [
-      { label: 'Store name', html: '<input class="input" id="newStoreName" placeholder="Enter store name">' },
-      { label: 'Merchant organization', html: '<select class="input" id="newStoreOrg">' + (C.organizations || []).map(function (x) { return '<option value="' + esc(x.id) + '">' + esc(x.name) + '</option>'; }).join('') + '</select>' },
-      { label: 'Product', html: '<select class="input" id="newStoreProduct"><option value="BestShopio">BestShopio</option><option value="BestCheckout">BestCheckout</option></select>' },
-      { label: 'Plan', html: '<select class="input" id="newStorePlan">' + (C.plans || []).map(function (x) { return '<option value="' + esc(x.name) + '">' + esc(x.name) + '</option>'; }).join('') + '</select>' }
-    ], 'Create record', function (layer) {
-      var name = layer.querySelector('#newStoreName').value.trim();
-      if (!name) { toast('Enter a store name.'); return; }
-      var org = findOrganization(layer.querySelector('#newStoreOrg').value);
-      var product = layer.querySelector('#newStoreProduct').value;
-      var record = { id: 'store_' + Date.now(), name: name, organizationId: org.id, organization: org.name, owner: org.primary, type: product === 'BestCheckout' ? 'bestcheckout' : 'bestshopio', lifecycle: 'Provisioning', plan: layer.querySelector('#newStorePlan').value, region: 'US', createdAt: 'Jul 29, 2026', provisioning: 'In progress', connection: 'Not connected', domainHealth: 'Pending', product: product, nextAction: 'Finish provisioning', shopify: '--' };
-      C.stores.push(record); org.stores += 1; audit('Created store record', name, 'Provisioning'); layer.remove(); toast('Store record created.'); route('#/stores/' + record.id);
-    });
-  }
-  function editStore(record, root) {
-    modalFields('Edit store record', [
-      { label: 'Plan', html: '<select class="input" id="storePlan">' + (C.plans || []).map(function (x) { return '<option value="' + esc(x.name) + '"' + (x.name === record.plan ? ' selected' : '') + '>' + esc(x.name) + '</option>'; }).join('') + '</select>' },
-      { label: 'Lifecycle', html: '<select class="input" id="storeLifecycle"><option value="Active"' + (record.lifecycle === 'Active' ? ' selected' : '') + '>Active</option><option value="Provisioning"' + (record.lifecycle === 'Provisioning' ? ' selected' : '') + '>Provisioning</option><option value="Suspended"' + (record.lifecycle === 'Suspended' ? ' selected' : '') + '>Suspended</option></select>' },
-      { label: 'Region', html: '<select class="input" id="storeRegion"><option value="US"' + (record.region === 'US' ? ' selected' : '') + '>US</option><option value="DE"' + (record.region === 'DE' ? ' selected' : '') + '>DE</option><option value="UK"' + (record.region === 'UK' ? ' selected' : '') + '>UK</option></select>' }
-    ], 'Save changes', function (layer) {
-      record.plan = layer.querySelector('#storePlan').value; record.lifecycle = layer.querySelector('#storeLifecycle').value; record.region = layer.querySelector('#storeRegion').value;
-      audit('Updated store record', record.name, 'Saved'); layer.remove(); toast('Store record updated.'); stores(root, [record.id]);
-    });
+  function storeRows(list) {
+    if (!list.length) return listEmpty('No stores match these filters.');
+    return list.map(function (item) {
+      var setup = storeSetup(item);
+      return '<tr data-store="' + esc(item.id) + '"><td>' + storeNameCell(item) + '</td><td class="hide-md">' + esc(item.product) + '</td><td>' + status(storeStatusLabel(item.lifecycle)) + '</td><td class="hide-sm">' + statusOrDash(storeInstall(item)) + '</td><td class="hide-xs">' + storeSetupTags(setup) + '</td><td><a class="ops-act" href="#/stores/' + esc(item.id) + '" title="View" aria-label="View">' + icon('eye', 16) + '</a></td></tr>';
+    }).join('');
   }
   function storeDetail(root, id) {
     var record = findStore(id);
     if (!record) { stores(root, []); return; }
-    var hosts = (C.hosts || []).filter(function (x) { return x.storeId === record.id; });
-    var services = (C.integrations || []).filter(function (x) { return x.storeId === record.id; });
-    var body = '<div class="ops-info-grid">' + fact('Merchant organization', '<a class="ops-link" href="#/organizations/' + esc(record.organizationId) + '">' + esc(record.organization) + '</a>') + fact('Product', esc(record.product)) + fact('Plan', esc(record.plan)) + fact('Lifecycle', status(record.lifecycle)) + fact('Provisioning', status(record.provisioning)) + fact('Service health', status(record.connection === 'Healthy' ? 'Healthy' : record.connection)) + '</div>' +
-      '<div class="ops-layout"><div class="ops-stack"><section class="ops-panel"><div class="ops-panel-head"><div><div class="ops-panel-title">Store lifecycle</div><div class="ops-panel-sub">One store record persists through provisioning, active operation and upgrades.</div></div></div><div class="ops-panel-body"><div class="ops-health-row"><div><strong>Created</strong><span>' + esc(record.createdAt) + ' · ' + esc(record.region) + '</span></div></div><div class="ops-health-row"><div><strong>Next operational action</strong><span>' + esc(record.nextAction) + '</span></div>' + status(record.connection === 'Healthy' ? 'No action required' : record.connection) + '</div><div class="ops-note">BestCheckout keeps its independent merchant experience. This page only coordinates the shared store record, provisioning, hosts and service health.</div></div></section>' +
-      '<section class="ops-panel"><div class="ops-panel-head"><div><div class="ops-panel-title">Published hosts</div></div><a class="ops-link" href="#/domains">All domains</a></div><div class="ops-table-wrap"><table class="ops-table"><thead><tr><th>Host</th><th>Usage</th><th>Status</th></tr></thead><tbody>' + (hosts.length ? hosts.map(function (host) { return '<tr><td>' + linkCell(host.host, host.target, '#/domains/' + host.id) + '</td><td>' + esc(host.usage === 'checkout' ? 'Checkout' : 'Storefront') + '</td><td>' + status(host.status) + '</td></tr>'; }).join('') : '<tr><td colspan="3"><span class="ops-meta">No host is attached to this store yet.</span></td></tr>') + '</tbody></table></div></section></div>' +
-      '<aside class="ops-stack"><section class="ops-panel"><div class="ops-panel-head"><div><div class="ops-panel-title">Service connections</div></div></div><div class="ops-panel-body">' + (services.length ? services.map(function (service) { return '<div class="ops-health-row"><div><strong>' + esc(service.provider) + '</strong><span>' + esc(service.capability) + '</span></div>' + status(service.status) + '</div>'; }).join('') : '<div class="ops-empty"><strong>No connection record</strong><p>Connect services from the operations workspace.</p></div>') + '</div></section><section class="ops-panel"><div class="ops-panel-head"><div><div class="ops-panel-title">Store identity</div></div></div><div class="ops-panel-body"><div class="ops-health-row"><div><strong>Primary merchant contact</strong><span>' + esc(record.owner) + '</span></div></div><div class="ops-health-row"><div><strong>Source connection</strong><span>' + esc(record.shopify) + '</span></div></div></div></section></aside></div>';
-    render(root, page(record.name, 'Shared store record and platform service status.', '<button class="btn btn-primary" id="editStore">Edit store</button>', body, back('#/stores', 'Stores')),
-      function (scope) { scope.querySelector('#editStore').onclick = function () { editStore(record, root); }; });
+    var install = findInstall(record.id);
+    var isBc = record.type === 'bestcheckout';
+    var usage = detailUsage(record);
+    var connectedDomains = storeConnectedDomains(record);
+    var payments = storePayments(record);
+    var email = storeEmail(record);
+    var setupFacts =
+      '<div><span>Email</span><strong>' + (email ? '<span class="i18n-skip">' + esc(email) + '</span>' : '<span>—</span>') + '</strong></div>' +
+      '<div><span>Connected domain</span><strong>' + (connectedDomains.length ? storeOverviewHosts(connectedDomains, isBc ? null : record) : '<span>—</span>') + '</strong></div>' +
+      '<div><span>Configured payment providers</span><strong>' + storePaymentText(payments.configured) + '</strong></div>' +
+      '<div><span>Active payment providers</span><strong>' + storePaymentText(payments.active) + '</strong></div>' +
+      (isBc ? installLinkFact(record, install) : '<div class="ops-created-fact"><span>Created at</span><strong>' + esc(record.createdAt || '—') + '</strong></div>');
+    var hero = '<section class="ops-panel ops-store-hero"><div class="ops-panel-head"><div><div class="ops-panel-title">Overview</div></div><div class="ops-store-hero-status">' + status(storeStatusLabel(record.lifecycle)) + (storeInstall(record) ? status(storeInstall(record)) : '') + storeSetupTags(storeSetup(record)) + '</div></div><div class="ops-store-hero-main"><div class="ops-store-hero-meta">' +
+      '<div><span>Store name</span><strong>' + esc(record.name) + '</strong></div>' +
+      '<div><span>Store type</span><strong>' + esc(record.product) + '</strong></div>' +
+      '<div><span>Shop ID</span><strong>' + esc(storeShopId(record) || '—') + '</strong></div>' +
+      '<div><span>' + (isBc ? 'Shopify domain' : 'Store domain') + '</span><strong>' + storePreviewLink(record, isBc ? (record.shopify || '—') : storeDefaultHost(record)) + '</strong></div>' +
+      '</div></div>' +
+      (setupFacts ? '<div class="ops-store-hero-setup">' + setupFacts + '</div>' : '') +
+      '</section>';
+    var kpis;
+    var purchaseFlows = [];
+    var usagePanel = '';
+    var syncPanel = '';
+    if (isBc) {
+      kpis = '<div class="ops-kpi-grid ops-kpi-grid-4">' +
+        kpiHtml('Flows', usage ? usage.flowsTotal : '—', usage ? kpiCountNote(usage.flowsActive, 'in use') : '') +
+        kpiHtml('Pages', usage ? usage.pagesTotal : '—', usage ? kpiCountNote(usage.pagesActive, 'in use') : '') +
+        kpiHtml('Bundles', usage ? usage.bundlesTotal : '—', usage ? kpiCountNote(usage.bundlesActive, 'in use') : '') +
+        kpiHtml('Subscriptions', usage ? usage.subsTotal : '—', usage ? kpiCountNote(usage.subsSynced, 'already synced') + '<span> · </span>' + kpiCountNote(usage.subsCreated, 'created here') : '') +
+        kpiHtml('Contracts', usage ? usage.contracts : '—', usage ? contractNote(usage) : '') +
+        kpiHtml('Orders', usage ? usage.ordersTotal : '—', usage ? orderSyncNote(usage) : '') +
+        kpi('GMV', usage ? usage.gmv : '—') +
+        kpi('AOV', usage ? usage.aov : '—') +
+        '</div>';
+      purchaseFlows = ((usage && usage.flows) || []).slice().sort(function (a, b) { return Number(b.priority || 0) - Number(a.priority || 0); });
+      usagePanel = '<section class="ops-panel"><div class="ops-panel-head"><div><div class="ops-panel-title">Purchase flows</div></div></div><div class="ops-panel-body ops-flow-body"><table class="ops-flow-table"><thead><tr><th>Purchase flow name</th><th>Priority</th><th>Funnel type</th><th>Traffic</th><th>Conversion</th><th>AOV</th><th>Status</th></tr></thead><tbody id="storeFlowRows"></tbody></table></div><div class="ops-table-foot"><span class="ops-table-total" id="storeFlowTotal"></span><div class="pg" id="storeFlowPagination"></div></div></section>';
+      var syncItems = (usage && usage.syncItems && usage.syncItems.length) ? usage.syncItems : emptyBcUsage(isShopifyConnected(record)).syncItems;
+      var syncSub = 'Shopify catalog pull and order writeback.';
+      var syncBody = syncItems.length
+        ? syncItems.map(function (item) {
+            var syncName = item.name === 'Collections'
+              ? (window.I18N && window.I18N.lang === 'zh' ? '商品系列' : 'Collections')
+              : item.name;
+            return '<div class="ops-health-row"><div><strong' + (item.name === 'Collections' ? ' class="i18n-skip"' : '') + '>' + esc(syncName) + '</strong><span>' + esc(item.note) + '</span></div>' + status(item.status) + '</div>';
+          }).join('')
+        : '<div class="ops-empty ops-empty-compact"><strong>Waiting for connection</strong><p>Product, collection, customer, discount, shipping, store setting, subscription and writeback sync appear after the store is connected.</p></div>';
+      syncPanel = '<section class="ops-panel"><div class="ops-panel-head"><div><div class="ops-panel-title">Data sync</div><div class="ops-panel-sub">' + esc(syncSub) + (usage && usage.syncChecked ? '<span> · </span><span>' + esc(usage.syncChecked) + '</span>' : '') + '</div></div>' + (usage ? status(usage.syncStatus) : '') + '</div><div class="ops-panel-body">' + syncBody + '</div></section>';
+    } else {
+      var catalog = usage || emptyBsUsage();
+      kpis = '<div class="ops-kpi-grid ops-kpi-grid-4">' +
+        catalogKpi('Products', '商品', catalog.products, kpiCountNote(catalog.productsLive || 0, 'on the storefront')) +
+        catalogKpi('Collections', '商品系列', catalog.collections, kpiCountNote(catalog.collectionsPublished || 0, 'visible in the catalog')) +
+        catalogKpi('Customers', '客户', catalog.customers, '') +
+        catalogKpi('Discounts', '促销', catalog.discounts, kpiCountNote(catalog.discountsActive || 0, 'in effect')) +
+        catalogKpi('Reviews', '评价', catalog.reviews, kpiCountNote(catalog.reviewsPending || 0, 'awaiting reply')) +
+        catalogKpi('Orders', '订单', catalog.ordersTotal, kpiCountNote(catalog.orders7d || 0, 'in the last 7 days')) +
+        kpi('GMV', catalog.gmv) +
+        kpi('AOV', catalog.aov) +
+        '</div>';
+    }
+    var timeline = onboardPanel(record, install);
+    var extra = usagePanel + syncPanel;
+    var body = '<div class="ops-store-detail">' + hero + timeline + kpis + (extra ? '<div class="ops-layout ops-layout-single"><div class="ops-stack">' + extra + '</div></div>' : '') + '</div>';
+    render(root, page(record.name, '', '', body, '', '#/stores'),
+      function (scope) {
+        var installLinkBtn = scope.querySelector('[data-install-link]');
+        if (installLinkBtn) {
+          installLinkBtn.onclick = function (event) {
+            event.stopPropagation();
+            openInstallLinkModal(record, function () { stores(root, [record.id]); });
+          };
+        }
+        var copyInstallBtn = scope.querySelector('[data-copy-install-link]');
+        if (copyInstallBtn) {
+          copyInstallBtn.onclick = function (event) {
+            event.stopPropagation();
+            copyText(copyInstallBtn.getAttribute('data-copy-install-link'), 'Installation link copied');
+          };
+        }
+        var flowRowsEl = scope.querySelector('#storeFlowRows');
+        if (flowRowsEl) {
+          var flowPage = 1;
+          var flowPageSize = 10;
+          function drawFlows() {
+            var pager = pagerHtml(flowPage, flowPageSize, purchaseFlows.length, 'flow-page', 'storeFlowPageSize');
+            flowPage = pager.page;
+            var start = (flowPage - 1) * flowPageSize;
+            flowRowsEl.innerHTML = flowRows(purchaseFlows.slice(start, start + flowPageSize));
+            scope.querySelector('#storeFlowTotal').textContent = 'Total ' + purchaseFlows.length + ' purchase flows';
+            scope.querySelector('#storeFlowPagination').innerHTML = pager.html;
+            var sizeEl = scope.querySelector('#storeFlowPageSize');
+            if (sizeEl) sizeEl.onchange = function () { flowPageSize = Number(sizeEl.value) || 10; flowPage = 1; drawFlows(); };
+            if (window.I18N && window.I18N.apply) {
+              window.I18N.apply(flowRowsEl);
+              window.I18N.apply(scope.querySelector('.ops-table-foot'));
+            }
+          }
+          scope.querySelector('#storeFlowPagination').onclick = function (event) {
+            var item = event.target.closest('[data-flow-page]');
+            if (!item) return;
+            flowPage = Number(item.getAttribute('data-flow-page')) || 1;
+            drawFlows();
+          };
+          drawFlows();
+        }
+      });
   }
   function stores(root, parts) {
     var id = cleanPart(parts && parts[0]);
     if (id) { storeDetail(root, id); return; }
-    var body = '<div class="ops-toolbar"><span class="ops-search">' + icon('search', 16) + '<input id="storeSearch" placeholder="Search store, merchant or domain"></span><select class="ops-select" id="storeProduct"><option value="">All products</option><option value="BestShopio">BestShopio</option><option value="BestCheckout">BestCheckout</option></select><select class="ops-select" id="storeLifecycle"><option value="">All lifecycle states</option><option value="Active">Active</option><option value="Provisioning">Provisioning</option><option value="Suspended">Suspended</option></select></div><div class="ops-table-card"><div class="ops-table-wrap"><table class="ops-table"><thead><tr><th style="width:25%">Store</th><th class="hide-md" style="width:13%">Product</th><th class="hide-sm" style="width:12%">Plan</th><th style="width:14%">Lifecycle</th><th class="hide-sm" style="width:14%">Health</th><th class="hide-xs">Next action</th><th style="width:56px"></th></tr></thead><tbody id="storeRows"></tbody></table></div></div>';
-    render(root, page('Stores', 'Manage the shared store record, lifecycle, plan and service health. Merchant-facing configurations remain in their own backends.', '<button class="btn btn-primary" id="createStore">Create store</button>', body), function (scope) {
-      function draw() {
-        var query = (scope.querySelector('#storeSearch').value || '').toLowerCase();
-        var product = scope.querySelector('#storeProduct').value; var lifecycle = scope.querySelector('#storeLifecycle').value;
-        var list = (C.stores || []).filter(function (item) { return (!query || (item.name + ' ' + item.organization + ' ' + item.shopify).toLowerCase().indexOf(query) >= 0) && (!product || item.product === product) && (!lifecycle || item.lifecycle === lifecycle); });
-        scope.querySelector('#storeRows').innerHTML = storeRows(list);
+    var typeOptions = [{ value: 'BestShopio', label: 'BestShopio' }, { value: 'BestCheckout', label: 'BestCheckout' }];
+    var statusOptions = [{ value: 'Active', label: 'Enabled' }, { value: 'Provisioning', label: 'Opening' }, { value: 'Suspended', label: 'Disabled' }];
+    var installOptions = [
+      { value: 'preparing', label: 'Preparing install link' },
+      { value: 'ready', label: 'Ready to install' },
+      { value: 'expired', label: 'Install link expired' },
+      { value: 'failed', label: 'Install failed' },
+      { value: 'reauth', label: 'Reauthorization needed' },
+      { value: 'connected', label: 'Connected' }
+    ];
+    var setupOptions = [
+      { value: 'domain-ok', label: 'Domain connected' },
+      { value: 'domain', label: 'Domain not connected' },
+      { value: 'payment-ok', label: 'Payment connected' },
+      { value: 'payment', label: 'Payment not connected' }
+    ];
+    var body = '<div class="ops-table-card"><div class="ops-filter-bar">' +
+      '<div class="ops-kw"><select class="filter-select" id="storeSearchField" data-ui-fit data-ui-match-width style="border-top-right-radius:0;border-bottom-right-radius:0"><option value="name">Store name</option><option value="domain">Domain</option><option value="shopId">Shop ID</option></select>' +
+      '<span class="ops-search"><input id="storeSearch" placeholder="Search">' + icon('search', 16) + '</span></div>' +
+      multiCheckHtml('storeProduct', 'All store types', typeOptions) +
+      multiCheckHtml('storeLifecycle', 'All store statuses', statusOptions) +
+      multiCheckHtml('storeInstall', 'All install statuses', installOptions) +
+      multiCheckHtml('storeSetup', 'All setup statuses', setupOptions) +
+      '<div class="ops-filter-tags" id="storeFilterTags"></div></div><div class="ops-table-wrap"><table class="ops-table ops-table-stores"><thead><tr><th>Store</th><th class="hide-md">Store type</th><th>Store status</th><th class="hide-sm">Install</th><th class="hide-xs">Setup</th><th>Action</th></tr></thead><tbody id="storeRows"></tbody></table></div>' +
+      '<div class="ops-table-foot"><span class="ops-table-total" id="storeTotal">Total 0 records</span><div class="pg" id="storePagination"></div></div></div>';
+    render(root, page('Stores', '', '', body), function (scope) {
+      var pageNo = 1;
+      var pageSize = 20;
+      var lastFilter = '';
+      var selectedTypes = [];
+      var selectedStatuses = [];
+      var selectedInstalls = [];
+      var selectedSetup = [];
+      var multiState = { open: '', painters: [], paintAll: function () { multiState.painters.forEach(function (paint) { paint(); }); } };
+      function optionLabel(options, value) {
+        return ((options.filter(function (opt) { return opt.value === value; })[0] || {}).label || value);
       }
-      bindSearch(scope, '#storeSearch', ['#storeProduct', '#storeLifecycle'], draw); draw();
-      scope.querySelector('#createStore').onclick = function () { createStore(root); };
+      function filterTag(kind, label, values) {
+        var valueHtml = values.map(function (value) { return '<span>' + esc(value) + '</span>'; }).join(', ');
+        return '<span class="field-pill" data-clear-store="' + kind + '"><span class="muted">' + esc(label) + '</span>: ' + valueHtml + ' <span class="x">&times;</span></span>';
+      }
+      function paintStoreTags() {
+        var tagsEl = scope.querySelector('#storeFilterTags');
+        if (!tagsEl) return;
+        var query = ((scope.querySelector('#storeSearch') || {}).value || '').trim();
+        var tags = [];
+        var field = (scope.querySelector('#storeSearchField') || {}).value || 'name';
+        var fieldLabel = field === 'shopId' ? 'Shop ID' : (field === 'domain' ? 'Domain' : 'Store name');
+        if (query) tags.push(filterTag('keyword', fieldLabel, [query]));
+        if (selectedTypes.length) tags.push(filterTag('type', 'Store type', selectedTypes.map(function (value) { return optionLabel(typeOptions, value); })));
+        if (selectedStatuses.length) tags.push(filterTag('status', 'Store status', selectedStatuses.map(function (value) { return optionLabel(statusOptions, value); })));
+        if (selectedInstalls.length) tags.push(filterTag('install', 'Install', selectedInstalls.map(function (value) { return optionLabel(installOptions, value); })));
+        if (selectedSetup.length) tags.push(filterTag('setup', 'Setup', selectedSetup.map(function (value) { return optionLabel(setupOptions, value); })));
+        tagsEl.innerHTML = tags.join('');
+        if (window.I18N && window.I18N.apply) window.I18N.apply(tagsEl);
+      }
+      function storeMatchesSearch(item, query, field) {
+        if (!query) return true;
+        if (field === 'shopId') return storeShopId(item).toLowerCase().indexOf(query) >= 0;
+        if (field === 'domain') return storeSource(item).toLowerCase().indexOf(query) >= 0;
+        return String(item.name || '').toLowerCase().indexOf(query) >= 0;
+      }
+      function storeMatchesInstall(item) {
+        if (!selectedInstalls.length) return true;
+        var code = storeInstall(item) ? installCode(item) || 'preparing' : '';
+        return selectedInstalls.indexOf(code) >= 0;
+      }
+      function storeMatchesSetup(item) {
+        if (!selectedSetup.length) return true;
+        var setup = storeSetup(item);
+        return selectedSetup.some(function (key) {
+          var wantOk = /-ok$/.test(key);
+          var checkKey = key.replace(/-ok$/, '');
+          return setup.checks.some(function (check) { return check.key === checkKey && !!check.ok === wantOk; });
+        });
+      }
+      function pagerHtml(total) {
+        var pages = Math.max(1, Math.ceil(total / pageSize));
+        if (pageNo > pages) pageNo = pages;
+        var html = '<span class="pg-item' + (pageNo <= 1 ? ' disabled' : '') + '"' + (pageNo <= 1 ? '' : ' data-store-page="' + (pageNo - 1) + '"') + '>‹</span>';
+        for (var p = 1; p <= pages; p++) html += '<span class="pg-item' + (p === pageNo ? ' active' : '') + '" data-store-page="' + p + '">' + p + '</span>';
+        html += '<span class="pg-item' + (pageNo >= pages ? ' disabled' : '') + '"' + (pageNo >= pages ? '' : ' data-store-page="' + (pageNo + 1) + '"') + '>›</span>';
+        html += '<select class="pg-size" id="storePageSize" aria-label="Page size"><option value="10"' + (pageSize === 10 ? ' selected' : '') + '>10 / page</option><option value="20"' + (pageSize === 20 ? ' selected' : '') + '>20 / page</option><option value="50"' + (pageSize === 50 ? ' selected' : '') + '>50 / page</option><option value="100"' + (pageSize === 100 ? ' selected' : '') + '>100 / page</option></select>';
+        return html;
+      }
+      function draw() {
+        var field = (scope.querySelector('#storeSearchField') || {}).value || 'name';
+        var query = (scope.querySelector('#storeSearch').value || '').toLowerCase();
+        var filterKey = field + '|' + query + '|' + selectedTypes.slice().sort().join(',') + '|' + selectedStatuses.slice().sort().join(',') + '|' + selectedInstalls.slice().sort().join(',') + '|' + selectedSetup.slice().sort().join(',');
+        if (filterKey !== lastFilter) { pageNo = 1; lastFilter = filterKey; }
+        var list = (C.stores || []).filter(function (item) {
+          return storeMatchesSearch(item, query, field) &&
+            (!selectedTypes.length || selectedTypes.indexOf(item.product) >= 0) &&
+            (!selectedStatuses.length || selectedStatuses.indexOf(item.lifecycle) >= 0) &&
+            storeMatchesInstall(item) &&
+            storeMatchesSetup(item);
+        });
+        var total = list.length;
+        var start = (pageNo - 1) * pageSize;
+        scope.querySelector('#storeRows').innerHTML = storeRows(list.slice(start, start + pageSize));
+        scope.querySelector('#storeTotal').textContent = 'Total ' + total + ' records';
+        scope.querySelector('#storePagination').innerHTML = pagerHtml(total);
+        paintStoreTags();
+        if (window.I18N && window.I18N.apply) window.I18N.apply(scope.querySelector('.ops-table-foot'));
+      }
+      bindSearch(scope, '#storeSearch', ['#storeSearchField'], draw);
+      bindMultiCheck(scope, 'storeProduct', 'All store types', typeOptions, selectedTypes, draw, multiState);
+      bindMultiCheck(scope, 'storeLifecycle', 'All store statuses', statusOptions, selectedStatuses, draw, multiState);
+      bindMultiCheck(scope, 'storeInstall', 'All install statuses', installOptions, selectedInstalls, draw, multiState);
+      bindMultiCheck(scope, 'storeSetup', 'All setup statuses', setupOptions, selectedSetup, draw, multiState);
+      scope.querySelector('#storeFilterTags').onclick = function (event) {
+        var pill = event.target.closest('[data-clear-store]');
+        if (!pill) return;
+        var kind = pill.getAttribute('data-clear-store');
+        if (kind === 'keyword') scope.querySelector('#storeSearch').value = '';
+        if (kind === 'type') selectedTypes.splice(0, selectedTypes.length);
+        if (kind === 'status') selectedStatuses.splice(0, selectedStatuses.length);
+        if (kind === 'install') selectedInstalls.splice(0, selectedInstalls.length);
+        if (kind === 'setup') selectedSetup.splice(0, selectedSetup.length);
+        multiState.paintAll();
+        draw();
+      };
+      scope.addEventListener('click', function (event) {
+        if (multiState.open && !event.target.closest('.ops-multi-filter')) {
+          multiState.open = '';
+          multiState.paintAll();
+        }
+      });
+      scope.querySelector('#storeRows').onclick = function (event) {
+        var copyBtn = event.target.closest('[data-copy-shopid]');
+        if (copyBtn) {
+          event.preventDefault();
+          event.stopPropagation();
+          copyText(copyBtn.getAttribute('data-copy-shopid'), 'Shop ID copied');
+          return;
+        }
+        if (event.target.closest('.ops-store-preview')) return;
+        if (event.target.closest('a,button')) return;
+        var row = event.target.closest('tr[data-store]');
+        if (row) route('#/stores/' + row.getAttribute('data-store'));
+      };
+      scope.querySelector('#storePagination').onclick = function (event) {
+        var next = event.target.getAttribute('data-store-page');
+        if (!next) return;
+        pageNo = Number(next) || 1;
+        draw();
+      };
+      scope.querySelector('#storePagination').onchange = function (event) {
+        if (!event.target || event.target.id !== 'storePageSize') return;
+        pageSize = Number(event.target.value) || 20;
+        pageNo = 1;
+        draw();
+      };
+      draw();
+      setTimeout(function () { multiState.paintAll(); }, 0);
     });
   }
 
@@ -230,7 +1138,7 @@
     if (!record) { organizations(root, []); return; }
     var storesForOrg = (C.stores || []).filter(function (x) { return x.organizationId === record.id; });
     var body = '<div class="ops-info-grid">' + fact('Primary contact', esc(record.primary)) + fact('Contact email', esc(record.email)) + fact('Organization status', status(record.status)) + fact('Store count', esc(record.stores)) + fact('Primary plan', esc(record.plan)) + fact('Identity boundary', 'Merchant organization') + '</div>' +
-      '<div class="ops-layout"><section class="ops-panel"><div class="ops-panel-head"><div><div class="ops-panel-title">Associated stores</div><div class="ops-panel-sub">A merchant organization can own one or more shared store records.</div></div><a class="ops-link" href="#/stores">All stores</a></div><div class="ops-table-wrap"><table class="ops-table"><thead><tr><th>Store</th><th>Product</th><th>Lifecycle</th><th></th></tr></thead><tbody>' + storesForOrg.map(function (store) { return '<tr><td>' + linkCell(store.name, store.region, '#/stores/' + store.id) + '</td><td>' + esc(store.product) + '</td><td>' + status(store.lifecycle) + '</td><td><a class="ops-link" href="#/stores/' + store.id + '">Open</a></td></tr>'; }).join('') + '</tbody></table></div></section><aside class="ops-panel"><div class="ops-panel-head"><div><div class="ops-panel-title">Access boundary</div></div></div><div class="ops-panel-body"><p class="pcx-copy">Merchant members are managed with the organization and its stores. Platform staff accounts are managed separately in Account and never inherit merchant access automatically.</p><a class="btn btn-default" href="#/account">Open Account</a></div></aside></div>';
+      '<div class="ops-layout"><section class="ops-panel"><div class="ops-panel-head"><div><div class="ops-panel-title">Associated stores</div><div class="ops-panel-sub">A merchant organization can own one or more shared store records.</div></div><a class="ops-link" href="#/stores">All stores</a></div><div class="ops-table-wrap"><table class="ops-table"><thead><tr><th>Store</th><th>Store type</th><th>Store status</th><th></th></tr></thead><tbody>' + storesForOrg.map(function (store) { return '<tr><td>' + linkCell(store.name, store.region, '#/stores/' + store.id) + '</td><td>' + esc(store.product) + '</td><td>' + status(storeStatusLabel(store.lifecycle)) + '</td><td><a class="ops-link" href="#/stores/' + store.id + '">Open</a></td></tr>'; }).join('') + '</tbody></table></div></section><aside class="ops-panel"><div class="ops-panel-head"><div><div class="ops-panel-title">Access boundary</div></div></div><div class="ops-panel-body"><p class="pcx-copy">Merchant members are managed with the organization and its stores. Platform staff accounts are managed separately in Account and never inherit merchant access automatically.</p><a class="btn btn-default" href="#/account">Open Account</a></div></aside></div>';
     render(root, page(record.name, 'Merchant organization, contact and associated store records.', '<button class="btn btn-primary" id="editOrganization">Edit organization</button>', body, back('#/organizations', 'Merchants')),
       function (scope) { scope.querySelector('#editOrganization').onclick = function () { editOrganization(record, root); }; });
   }
@@ -618,28 +1526,92 @@
   /* ---------- BestCheckout operations: platform control plane only ---------- */
   function bcStoreName(id) { var record = findStore(id); return record ? record.name : 'Platform content'; }
   function bcTabs(active) {
-    var items = [['overview', 'Overview'], ['connections', 'Store connections'], ['routing', 'Routing and safety'], ['writebacks', 'Order writeback'], ['events', 'Events'], ['support', 'Merchant support']];
+    var items = [['overview', 'Overview'], ['installs', 'Install links'], ['connections', 'Store connections'], ['routing', 'Routing and safety'], ['writebacks', 'Order writeback'], ['events', 'Events'], ['support', 'Merchant support']];
     return '<nav class="ops-tabs">' + items.map(function (item) { return '<a class="ops-tab' + (active === item[0] ? ' active' : '') + '" href="#/bestcheckout' + (item[0] === 'overview' ? '' : '/' + item[0]) + '">' + item[1] + '</a>'; }).join('') + '</nav>';
+  }
+  function installActionLabel(code) {
+    return ({
+      preparing: 'Send install link',
+      ready: 'Record merchant install',
+      expired: 'Generate new install link',
+      failed: 'Send a new install link'
+    })[code] || 'Review install state';
+  }
+  function syncInstallToStore(item) {
+    var store = findStore(item.storeId);
+    var connection = (B.connections || []).filter(function (x) { return x.storeId === item.storeId; })[0];
+    if (store) {
+      store.installStatus = item.status;
+      store.nextAction = item.next;
+      if (item.status === 'connected') {
+        store.lifecycle = 'Active';
+        store.provisioning = 'Completed';
+        store.connection = 'Healthy';
+        store.domainSetup = store.domainSetup || 'Pending';
+        store.paymentSetup = store.paymentSetup || 'Not connected';
+      } else if (item.status === 'expired' || item.status === 'failed') {
+        store.connection = 'Not connected';
+      }
+    }
+    if (connection) {
+      connection.installStatus = item.status;
+      connection.next = item.next;
+      connection.authorization = item.status === 'connected' ? 'Connected' : (item.status === 'reauth' ? 'Reauthorization needed' : 'Not connected');
+      if (item.status === 'connected') { connection.sync = 'Healthy'; connection.webhook = '5 / 5 healthy'; }
+    }
+  }
+  function runInstallAction(id, rerender) {
+    var item = (B.installs || []).filter(function (x) { return x.id === id; })[0];
+    if (!item) return;
+    var store = findStore(item.storeId);
+    if ((item.status === 'preparing' || item.status === 'expired' || item.status === 'failed') && store) {
+      openInstallLinkModal(store, rerender);
+      return;
+    }
+    var title = installActionLabel(item.status);
+    confirmDialog(title, 'This records that the merchant completed Install and BestCheckout received the callback. It does not show tokens or Partner Dashboard details.', title, function () {
+      item.status = 'connected';
+      item.next = 'No action required';
+      syncInstallToStore(item);
+      audit(title, bcStoreName(item.storeId), installLabel(item.status));
+      toast(title + ' recorded.');
+      rerender();
+    });
   }
   function bcAction(root, title, copy, action, scope, section) {
     confirmDialog(title, copy, action, function () { audit(action, scope, 'Queued safely'); toast(action + ' recorded.'); bestcheckout(root, [section]); });
   }
   function bcOverview(root) {
-    var connections = B.connections || []; var routes = B.routes || []; var writebacks = B.writebacks || []; var events = B.events || [];
+    var connections = B.connections || []; var routes = B.routes || []; var writebacks = B.writebacks || []; var events = B.events || []; var installs = B.installs || [];
+    var openInstalls = installs.filter(function (x) { return x.status !== 'connected'; });
     var attention = [];
-    connections.filter(function (x) { return x.sync !== 'Healthy'; }).forEach(function (x) { attention.push({ id: x.id, type: 'connection', title: x.next, store: bcStoreName(x.storeId), detail: x.authorization + ' · ' + x.sync, state: x.sync }); });
+    openInstalls.forEach(function (x) { attention.push({ id: x.id, type: 'install', title: x.next, store: bcStoreName(x.storeId), detail: x.shop + ' · ' + installLabel(x.status), state: installLabel(x.status) }); });
+    connections.filter(function (x) { return x.installStatus === 'connected' && x.sync !== 'Healthy'; }).forEach(function (x) { attention.push({ id: x.id, type: 'connection', title: x.next, store: bcStoreName(x.storeId), detail: x.authorization + ' · ' + x.sync, state: x.sync }); });
     writebacks.filter(function (x) { return x.state !== 'Completed'; }).forEach(function (x) { attention.push({ id: x.id, type: 'writeback', title: 'Order writeback needs review', store: bcStoreName(x.storeId), detail: x.reference + ' · ' + x.detail, state: x.state }); });
     events.filter(function (x) { return x.status !== 'Completed'; }).forEach(function (x) { attention.push({ id: x.id, type: 'event', title: x.subject, store: bcStoreName(x.storeId), detail: x.detail, state: x.status }); });
-    var queue = attention.slice(0, 5).map(function (item) { return '<button class="ops-attention-item" data-bc-type="' + esc(item.type) + '" data-bc-id="' + esc(item.id) + '"><i class="ops-severity high"></i><div class="ops-attention-copy"><strong>' + esc(item.title) + '</strong><span>' + esc(item.store) + ' · ' + esc(item.detail) + '</span></div>' + status(item.state) + '</button>'; }).join('');
-    var body = bcTabs('overview') + '<div class="ops-note ops-warning"><strong>Platform boundary:</strong> This workspace monitors Shopify connections, deployment safety and order reconciliation. Merchant funnel drafts, page design and payment credentials stay in BestCheckout.</div><div class="ops-kpi-grid">' + kpi('Connected stores', connections.filter(function (x) { return x.authorization === 'Connected'; }).length, 'Shopify authorization is healthy', '') + kpi('Routes needing review', routes.filter(function (x) { return x.gate !== 'Passed'; }).length, 'Safety gate or fallback state', 'warn') + kpi('Retryable writebacks', writebacks.filter(function (x) { return x.state === 'Retryable'; }).length, 'Idempotent replay only', 'warn') + kpi('Open service events', events.filter(function (x) { return x.status !== 'Completed'; }).length, 'No raw payloads exposed', 'warn') + '</div><div class="ops-layout"><section class="ops-panel"><div class="ops-panel-head"><div><div class="ops-panel-title">Priority operational queue</div><div class="ops-panel-sub">Actions create safe, auditable follow-up work; they do not alter live checkout sessions.</div></div><a class="ops-link" href="#/bestcheckout/events">View events</a></div><div class="ops-attention">' + queue + '</div></section><aside class="ops-panel"><div class="ops-panel-head"><div><div class="ops-panel-title">Control plane</div></div></div><div class="ops-panel-body"><div class="ops-health-row"><div><strong>Merchant experience</strong><span>Independent BestCheckout backend</span></div>' + status('Protected') + '</div><div class="ops-health-row"><div><strong>Shared platform record</strong><span>Identity, store and operational state</span></div>' + status('Healthy') + '</div><div class="ops-health-row"><div><strong>Safety fallback</strong><span>Shopify native control remains available</span></div>' + status('Ready') + '</div></div></aside></div>';
+    var queue = attention.slice(0, 6).map(function (item) { return '<button class="ops-attention-item" data-bc-type="' + esc(item.type) + '" data-bc-id="' + esc(item.id) + '"><i class="ops-severity high"></i><div class="ops-attention-copy"><strong>' + esc(item.title) + '</strong><span>' + esc(item.store) + ' · ' + esc(item.detail) + '</span></div>' + status(item.state) + '</button>'; }).join('');
+    var body = bcTabs('overview') + '<div class="ops-note ops-warning"><strong>Platform boundary:</strong> This workspace prepares Custom App install links, then monitors Shopify connections, deployment safety and order reconciliation. Merchant funnel drafts, page design and payment credentials stay in BestCheckout.</div><div class="ops-kpi-grid">' + kpi('Connected stores', connections.filter(function (x) { return x.authorization === 'Connected'; }).length, 'Shopify authorization is healthy', '') + kpi('Install links in progress', openInstalls.length, 'Preparing, ready, expired or failed', openInstalls.length ? 'warn' : '') + kpi('Retryable writebacks', writebacks.filter(function (x) { return x.state === 'Retryable'; }).length, 'Idempotent replay only', 'warn') + kpi('Open service events', events.filter(function (x) { return x.status !== 'Completed'; }).length, 'No raw payloads exposed', 'warn') + '</div><div class="ops-layout"><section class="ops-panel"><div class="ops-panel-head"><div><div class="ops-panel-title">Priority operational queue</div><div class="ops-panel-sub">Actions create safe, auditable follow-up work; they do not alter live checkout sessions.</div></div><a class="ops-link" href="#/bestcheckout/installs">View install links</a></div><div class="ops-attention">' + queue + '</div></section><aside class="ops-panel"><div class="ops-panel-head"><div><div class="ops-panel-title">Control plane</div></div></div><div class="ops-panel-body"><div class="ops-health-row"><div><strong>Merchant experience</strong><span>Independent BestCheckout backend</span></div>' + status('Protected') + '</div><div class="ops-health-row"><div><strong>Shared platform record</strong><span>Identity, store and operational state</span></div>' + status('Healthy') + '</div><div class="ops-health-row"><div><strong>Safety fallback</strong><span>Shopify native control remains available</span></div>' + status('Ready') + '</div></div></aside></div>';
     render(root, page('BestCheckout operations', 'Platform control plane for BestCheckout service health, routing safety and reconciliation.', '', body), function (scope) {
-      scope.querySelectorAll('[data-bc-id]').forEach(function (button) { button.onclick = function () { var type = button.getAttribute('data-bc-type'); var id = button.getAttribute('data-bc-id'); if (type === 'connection') route('#/bestcheckout/connections'); else if (type === 'writeback') route('#/bestcheckout/writebacks'); else route('#/bestcheckout/events'); }; });
+      scope.querySelectorAll('[data-bc-id]').forEach(function (button) { button.onclick = function () { var type = button.getAttribute('data-bc-type'); if (type === 'install') route('#/bestcheckout/installs'); else if (type === 'connection') route('#/bestcheckout/connections'); else if (type === 'writeback') route('#/bestcheckout/writebacks'); else route('#/bestcheckout/events'); }; });
+    });
+  }
+  function bcInstalls(root) {
+    var rows = (B.installs || []).map(function (item) {
+      return '<tr><td>' + linkCell(bcStoreName(item.storeId), item.shop, '#/stores/' + item.storeId) + '</td><td>' + status(installLabel(item.status)) + '</td><td class="hide-md">' + esc(item.submittedAt || '—') + '</td><td class="hide-sm">' + esc(item.linkSentAt || 'Not sent') + '</td><td class="hide-xs">' + esc(item.expiresAt || 'After send') + '</td><td><span class="ops-meta">' + esc(item.next) + '</span></td><td>' + (item.status === 'connected' ? '<span class="ops-meta">No action</span>' : '<button class="btn btn-primary" data-install="' + esc(item.id) + '">' + esc(installActionLabel(item.status)) + '</button>') + '</td></tr>';
+    }).join('');
+    var body = bcTabs('installs') +
+      '<div class="ops-note">Shopify Custom App install links last 7 days. Merchant-facing copy: Preparing install link → Ready to install → Connected. Expired or failed links can be regenerated.</div>' +
+      '<div class="ops-table-card"><div class="ops-table-wrap"><table class="ops-table"><thead><tr><th>Store</th><th>Install state</th><th class="hide-md">Submitted</th><th class="hide-sm">Link sent</th><th class="hide-xs">Expires</th><th>Next action</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+    render(root, page('BestCheckout operations', 'Operate the Custom App install-link state machine. Tokens and Partner Dashboard details stay off this page.', '', body), function (scope) {
+      scope.querySelectorAll('[data-install]').forEach(function (button) {
+        button.onclick = function () { runInstallAction(button.getAttribute('data-install'), function () { bestcheckout(root, ['installs']); }); };
+      });
     });
   }
   function bcConnections(root) {
-    var rows = (B.connections || []).map(function (item) { return '<tr><td>' + linkCell(bcStoreName(item.storeId), item.adapter, '#/stores/' + item.storeId) + '</td><td>' + status(item.authorization) + '</td><td class="hide-md">' + esc(item.scopes) + '</td><td>' + status(item.sync) + '</td><td class="hide-sm"><span class="ops-meta">' + esc(item.webhook) + '<br>' + esc(item.checked) + '</span></td><td><button class="btn btn-default" data-connection="' + esc(item.id) + '">' + esc(item.sync === 'Healthy' ? 'Record review' : 'Create recovery task') + '</button></td></tr>'; }).join('');
-    var body = bcTabs('connections') + '<div class="ops-table-card"><div class="ops-table-wrap"><table class="ops-table"><thead><tr><th>Store</th><th>Authorization</th><th class="hide-md">Scopes</th><th>Sync</th><th class="hide-sm">Webhook health</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
-    render(root, page('BestCheckout operations', 'Review Shopify integration health and create merchant-safe recovery work.', '', body), function (scope) { scope.querySelectorAll('[data-connection]').forEach(function (button) { button.onclick = function () { var item = (B.connections || []).filter(function (x) { return x.id === button.getAttribute('data-connection'); })[0]; bcAction(root, item.sync === 'Healthy' ? 'Record connection review' : 'Create merchant recovery task', item.sync === 'Healthy' ? 'This records a connection-health review.' : 'This creates a guided merchant reconnection task. It does not show or reset authorization credentials.', item.sync === 'Healthy' ? 'Record review' : 'Create task', bcStoreName(item.storeId), 'connections'); }; }); });
+    var rows = (B.connections || []).map(function (item) { return '<tr><td>' + linkCell(bcStoreName(item.storeId), item.adapter, '#/stores/' + item.storeId) + '</td><td>' + status(installLabel(item.installStatus || (item.authorization === 'Connected' ? 'connected' : 'preparing'))) + '</td><td>' + status(item.authorization) + '</td><td class="hide-md">' + esc(item.scopes) + '</td><td>' + status(item.sync) + '</td><td class="hide-sm"><span class="ops-meta">' + esc(item.webhook) + '<br>' + esc(item.checked) + '</span></td><td><button class="btn btn-default" data-connection="' + esc(item.id) + '">' + esc(item.sync === 'Healthy' ? 'Record review' : (item.installStatus && item.installStatus !== 'connected' && item.installStatus !== 'reauth' ? 'Open install queue' : 'Create recovery task')) + '</button></td></tr>'; }).join('');
+    var body = bcTabs('connections') + '<div class="ops-table-card"><div class="ops-table-wrap"><table class="ops-table"><thead><tr><th>Store</th><th>Install state</th><th>Authorization</th><th class="hide-md">Scopes</th><th>Sync</th><th class="hide-sm">Webhook health</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+    render(root, page('BestCheckout operations', 'Review Shopify integration health and create merchant-safe recovery work.', '', body), function (scope) { scope.querySelectorAll('[data-connection]').forEach(function (button) { button.onclick = function () { var item = (B.connections || []).filter(function (x) { return x.id === button.getAttribute('data-connection'); })[0]; if (item.installStatus && item.installStatus !== 'connected' && item.installStatus !== 'reauth') { route('#/bestcheckout/installs'); return; } bcAction(root, item.sync === 'Healthy' ? 'Record connection review' : 'Create merchant recovery task', item.sync === 'Healthy' ? 'This records a connection-health review.' : 'This creates a guided merchant reconnection task. It does not show or reset authorization credentials.', item.sync === 'Healthy' ? 'Record review' : 'Create task', bcStoreName(item.storeId), 'connections'); }; }); });
   }
   function bcRouting(root) {
     var rows = (B.routes || []).map(function (item) { return '<tr><td>' + linkCell(bcStoreName(item.storeId), item.snapshot, '#/stores/' + item.storeId) + '</td><td>' + esc(item.surface) + '</td><td class="hide-md">' + esc(item.control) + '</td><td>' + status(item.gate) + '</td><td class="hide-sm">' + status(item.safety) + '</td><td><button class="btn btn-default" data-routegate="' + esc(item.id) + '">Review gate</button></td></tr>'; }).join('');
@@ -665,7 +1637,7 @@
   }
   function bestcheckout(root, parts) {
     var section = cleanPart(parts && parts[0]) || 'overview';
-    if (section === 'connections') bcConnections(root); else if (section === 'routing') bcRouting(root); else if (section === 'writebacks') bcWritebacks(root); else if (section === 'events') bcEvents(root); else if (section === 'support') bcSupport(root); else bcOverview(root);
+    if (section === 'installs') bcInstalls(root); else if (section === 'connections') bcConnections(root); else if (section === 'routing') bcRouting(root); else if (section === 'writebacks') bcWritebacks(root); else if (section === 'events') bcEvents(root); else if (section === 'support') bcSupport(root); else bcOverview(root);
   }
 
   window.SAAS_OPS = {
@@ -679,6 +1651,7 @@
     plans: plans,
     governance: governance,
     bestcheckout: bestcheckout,
+    installEmailPreview: installEmailPreview,
     contentApi: {
       esc: esc,
       icon: icon,

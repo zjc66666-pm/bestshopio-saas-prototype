@@ -28,6 +28,8 @@
     arrowLeft: '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
     right: '<path d="m9 18 6-6-6-6"/>', down: '<path d="m6 9 6 6 6-6"/>',
     search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+    eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+    external: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
     info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
     close: '<path d="M18 6 6 18M6 6l12 12"/>',
     user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
@@ -35,20 +37,18 @@
     out: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/>',
     history: '<path d="M3 12a9 9 0 1 0 9-9 9 9 0 0 0-6.36 2.64L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/>',
     check: '<path d="M20 6 9 17l-5-5"/>',
+    copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
   };
 
   // ---------- nav ----------
   var NAV = [
     { label: '', items: [
       { id: 'stores', label: 'Stores', icon: P.stores },
-      { id: 'domains', label: 'Domains', icon: P.globe },
-      { id: 'content', label: 'Help Center', icon: P.file }
-    ] },
-    { label: 'System settings', items: [
-      { id: 'account', label: 'Account', icon: P.account },
-      { id: 'menu', label: 'Menu', icon: P.menu },
+      { id: 'content', label: 'Help Center', icon: P.file },
       { id: 'category', label: 'Category', icon: P.category },
-      { id: 'attribution', label: 'Attribution', icon: P.attribution }
+      { id: 'attribution', label: 'Attribution', icon: P.attribution },
+      { id: 'menu', label: 'Menu', icon: P.menu },
+      { id: 'account', label: 'Account', icon: P.account }
     ] }
   ];
 
@@ -819,10 +819,44 @@
       '<a class="hdr-menu-item" href="signin.html">' + ico(P.out, 16) + 'Sign out</a>';
   }
 
+  function parseHash() {
+    var raw = (location.hash || '').replace(/^#\/?/, '');
+    var qi = raw.indexOf('?');
+    var path = qi >= 0 ? raw.slice(0, qi) : raw;
+    var query = {};
+    if (qi >= 0) {
+      raw.slice(qi + 1).split('&').forEach(function (pair) {
+        if (!pair) return;
+        var eq = pair.indexOf('=');
+        var key = decodeURIComponent((eq >= 0 ? pair.slice(0, eq) : pair).replace(/\+/g, ' '));
+        var val = decodeURIComponent((eq >= 0 ? pair.slice(eq + 1) : '').replace(/\+/g, ' '));
+        if (key) query[key] = val;
+      });
+    }
+    return { parts: path.split('/').filter(Boolean), query: query };
+  }
+  function isInstallEmailPreview() {
+    return parseHash().parts[0] === 'install-email-preview';
+  }
+
   function dispatch() {
-    var parts = (location.hash || '').replace(/^#\/?/, '').split('/').filter(Boolean);
+    var parsed = parseHash();
+    var parts = parsed.parts;
     var id = parts[0] || 'action-center';
     document.querySelectorAll('.modal-backdrop, .drawer-backdrop').forEach(function (layer) { layer.remove(); });
+    if (isInstallEmailPreview()) {
+      document.body.classList.add('is-email-preview');
+      var app = document.getElementById('app');
+      app.className = '';
+      if (window.SAAS_OPS && typeof window.SAAS_OPS.installEmailPreview === 'function') {
+        window.SAAS_OPS.installEmailPreview(app, parsed.query);
+      }
+      return;
+    }
+    if (document.body.classList.contains('is-email-preview')) {
+      location.reload();
+      return;
+    }
     // Views that need document-wide click handling (currently Account's status
     // filter) bind it directly on #root.  Always remove the outgoing handler
     // before the shared root is rendered by another route.
@@ -836,12 +870,17 @@
 
   function build() {
     var app = document.getElementById('app');
+    if (isInstallEmailPreview()) {
+      window.addEventListener('hashchange', dispatch);
+      dispatch();
+      return;
+    }
     app.classList.add('shell-root');
     app.innerHTML =
       '<header class="app-header">' +
         '<button class="sidebar-toggle" aria-label="Menu">' + ico(P.menu, 20) + '</button>' +
-        '<a class="hdr-logo" href="#/action-center"><span class="brand-mark">B</span>' +
-        '<span class="hdr-logo-name">Platform Center</span></a><span class="hdr-context">Internal operations</span>' +
+        '<a class="hdr-logo" href="#/action-center"><img class="brand-mark-img" src="assets/brand-logo.svg?v=20260907-logo3" width="32" height="32" alt="BestShopio &amp; BestCheckout">' +
+        '<span class="hdr-logo-name">BestShopio &amp; BestCheckout Platform</span></a>' +
         '<div class="hdr-right"><div class="hdr-menu-wrap">' +
           '<button class="hdr-user" id="hdr-user" aria-label="Account">' + ico(P.user, 18) + '</button></div></div>' +
       '</header>' +
