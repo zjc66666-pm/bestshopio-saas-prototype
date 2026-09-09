@@ -6,7 +6,7 @@
 
   window.I18N.extend({
     'Platform Center': 'SaaS 中台',
-    'BestShopio & BestCheckout Platform': 'BestShopio & BestCheckout 中台',
+    'BestShopio & BestCheckout Platform': 'BestShopio & BestCheckout 运营后台',
     'Platform': '平台配置',
     'Account': '账号',
     'Category': '类目',
