@@ -722,12 +722,16 @@
   .ops-store-hero-setup .ops-store-preview:hover,
   .ops-store-hero-setup .ops-store-preview:hover span,
   .ops-store-hero-setup .ops-store-preview:hover svg { color: var(--brand); }
+  .ops-credential-fact { grid-column: span 2; min-width: 0; }
   .ops-install-fact, .ops-created-fact { grid-column: 1 / -1; min-width: 0; }
   .ops-install-fact strong, .ops-install-value { min-width: 0; }
   .ops-install-value { overflow-wrap: anywhere; }
   .ops-install-link { display: inline; max-width: none; overflow: visible; white-space: normal; overflow-wrap: anywhere; word-break: break-all; color: inherit; font-size: inherit; font-weight: inherit; }
   .ops-install-copy { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-left: 6px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: var(--ink-muted); vertical-align: text-top; cursor: pointer; }
   .ops-install-copy:hover { background: #eef1f6; color: var(--ink); }
+  .ops-install-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 10px; }
+  .ops-install-actions .ops-install-link-btn,
+  .ops-install-actions .ops-preview-email { margin-top: 0; }
   .ops-install-link-btn { margin-top: 8px; }
   .ops-preview-email { display: inline-block; margin-top: 8px; color: var(--brand); font-size: 13px; font-weight: 650; text-decoration: none; }
   .ops-preview-email:hover { text-decoration: underline; }
@@ -984,9 +988,9 @@
 <body class="bg-page text-ink font-sans antialiased">
   <div id="app" class="flex h-screen overflow-hidden"></div>
   <script src="assets/widgets.js?v=20260907-store-filter-select1"></script>
-  <script src="js/data.js?v=20260908-bsenabled1"></script>
+  <script src="js/data.js?v=20260910-authlink5"></script>
   <script src="js/attribution.js?v=20260813-attribution-lndc-v1"></script>
-  <script src="js/ops.js?v=20260908-onboardsum1"></script>
+  <script src="js/ops.js?v=20260910-authlink8"></script>
   <script src="js/pages/content/logic/content-model.js?v=20260731-content-pages-v1"></script>
   <script src="js/pages/content/logic/article-markdown.js?v=20260731-content-pages-v1"></script>
   <script src="js/pages/content/shared.js?v=20260731-content-pages-v2"></script>
@@ -999,7 +1003,7 @@
   <script src="js/app.js?v=20260908-installmail1"></script>
   <script src="assets/i18n.js?v=20260729-bilingual-v1"></script>
   <script src="assets/i18n/platform.js?v=20260909-ops-console1"></script>
-  <script src="assets/i18n/saas-console.js?v=20260908-openfor1"></script>
+  <script src="assets/i18n/saas-console.js?v=20260910-authlink8"></script>
 </body>
 </html>
 

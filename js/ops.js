@@ -466,21 +466,40 @@
   function expireStamp(fromMs) {
     return opsStamp((isFinite(fromMs) ? fromMs : opsNow()) + 7 * 24 * 3600000);
   }
-  function fallbackInstallLink(record) {
-    var shop = String((record && record.shopify) || '').replace(/\.myshopify\.com$/i, '');
+  function shopHandleFromRecord(record) {
+    var shop = String((record && record.shopify) || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/\.myshopify\.com$/i, '');
     if (!shop || shop === '--') return '';
-    return 'https://admin.shopify.com/store/' + shop + '/oauth/install_custom_app?client_id=8f2c91a0b47d3e6c5a19d80e4b27c3f1&redirect_uri=https%3A%2F%2Fapp.bestcheckout.com%2Fshopify%2Fcallback';
+    return shop;
+  }
+  function generateAuthorizeLink(record, clientId) {
+    var shop = shopHandleFromRecord(record) || 'your-store';
+    var state = 'bc_' + shop + '_' + Date.now().toString(36);
+    return 'https://' + shop + '.myshopify.com/admin/oauth/authorize?client_id=' + encodeURIComponent(clientId) +
+      '&scope=read_products&redirect_uri=' + encodeURIComponent('https://api.stores.bestfulfill.tech/sso/sso/bestcheckout/shopify/callback') +
+      '&state=' + encodeURIComponent(state);
+  }
+  function savedClientId(record, install) {
+    var item = install || findInstall(record && record.id);
+    return String((item && item.clientId) || (record && record.clientId) || '').trim();
+  }
+  function savedClientSecret(record, install) {
+    var item = install || findInstall(record && record.id);
+    return String((item && item.clientSecret) || (record && record.clientSecret) || '').trim();
+  }
+  function hasAppCredentials(record, install) {
+    var item = install || findInstall(record && record.id);
+    return Boolean(savedClientId(record, item) && (savedClientSecret(record, item) || (item && item.clientSecretSaved) || (record && record.clientSecretSaved)));
   }
   function storeInstallLink(record, install) {
     if (install && install.installLink) return install.installLink;
     if (record && record.installLink) return record.installLink;
-    var code = installCode(record) || (install && install.status) || '';
-    if (!code || code === 'preparing') return '';
-    return fallbackInstallLink(record);
+    var clientId = savedClientId(record, install);
+    return clientId ? generateAuthorizeLink(record, clientId) : '';
   }
-  function installLinkAction(code) {
-    if (code === 'preparing') return 'Enter install link';
-    if (code === 'expired' || code === 'failed') return 'Edit install link';
+  function installLinkAction(code, record, install) {
+    if (code === 'preparing' && !hasAppCredentials(record, install)) return 'Enter app credentials';
+    if (code === 'preparing') return 'Send install link';
+    if (code === 'expired' || code === 'failed') return 'Resend install link';
     return '';
   }
   function ensureInstall(record) {
@@ -496,38 +515,47 @@
       expiresAt: '',
       owner: 'Commerce ops',
       next: record.nextAction || '',
-      installLink: record.installLink || ''
+      installLink: record.installLink || '',
+      clientId: record.clientId || '',
+      clientSecret: record.clientSecret || '',
+      clientSecretSaved: Boolean(record.clientSecretSaved || record.clientSecret)
     };
     B.installs = B.installs || [];
     B.installs.push(item);
     return item;
   }
-  function validateInstallLink(value) {
-    var link = String(value || '').trim();
-    if (!link) return 'Enter the install link.';
-    try {
-      var parsed = new URL(link);
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return 'Enter a valid install link.';
-    } catch (err) {
-      return 'Enter a valid install link.';
-    }
+  function validateClientId(value) {
+    if (!String(value || '').trim()) return 'Enter the Client ID.';
     return '';
   }
-  function applyInstallLink(record, link, rerender) {
+  function validateClientSecret(value, required) {
+    if (!required) return '';
+    if (!String(value || '').trim()) return 'Enter the Client Secret.';
+    return '';
+  }
+  function applyGeneratedInstallLink(record, clientId, secretSaved, rerender, toastCopy, clientSecret) {
     var item = ensureInstall(record);
     var sentAt = opsStamp(opsNow());
+    var link = generateAuthorizeLink(record, clientId);
+    var secret = String(clientSecret || item.clientSecret || record.clientSecret || '').trim();
+    item.clientId = clientId;
+    item.clientSecret = secret;
+    item.clientSecretSaved = secretSaved || Boolean(secret);
     item.installLink = link;
     item.status = 'ready';
     item.linkSentAt = sentAt;
     item.expiresAt = expireStamp(opsNow());
     item.next = 'Waiting for merchant to install';
     syncInstallToStore(item);
+    record.clientId = clientId;
+    record.clientSecret = secret;
+    record.clientSecretSaved = secretSaved || Boolean(secret);
     record.installLink = link;
     record.onboarding = record.onboarding || {};
     if (!record.onboarding.createdAt) record.onboarding.createdAt = record.createdAt || sentAt;
     record.onboarding.linkSentAt = sentAt;
     audit('Sent install link', record.name, 'Ready to install');
-    toast('Install link emailed to the store.');
+    toast(toastCopy || 'Install link emailed to the store.');
     if (rerender) rerender();
   }
   function installEmailKind(code) {
@@ -548,14 +576,14 @@
     var record = findStore(params.store) || {};
     var install = findInstall(record.id);
     var kind = params.kind === 'renew' ? 'renew' : 'first';
-    var link = String(params.link || storeInstallLink(record, install) || fallbackInstallLink(record) || 'https://');
+    var link = String(params.link || storeInstallLink(record, install) || (savedClientId(record, install) ? generateAuthorizeLink(record, savedClientId(record, install)) : '') || 'https://');
     var email = storeEmail(record) || 'store@example.com';
     var domain = shopifyDomain(record);
     var isRenew = kind === 'renew';
     var subject = isRenew ? ('Your new BestCheckout install link for ' + domain) : ('Install BestCheckout on ' + domain);
     var title = isRenew ? 'Your previous install link has expired' : 'Install BestCheckout on your Shopify store';
     var lead = isRenew
-      ? 'Shopify install links are valid for 7 days. The previous link for <b class="i18n-skip">' + esc(domain) + '</b> can no longer be used. This is the new install link. Open it with the <b>store owner</b> account for this shop.'
+      ? 'This install link is valid for 7 days. The previous link for <b class="i18n-skip">' + esc(domain) + '</b> can no longer be used. This is the new install link. Open it with the <b>store owner</b> account for this shop.'
       : 'Your install link for <b class="i18n-skip">' + esc(domain) + '</b> is ready. Open it with the <b>store owner</b> account for this shop.';
     var expiry = 'This install link expires in 7 days. Please install it as soon as possible.';
     var note = isRenew
@@ -595,50 +623,101 @@
     document.title = subject;
     apply(root);
   }
-  function openInstallLinkModal(record, rerender) {
+  function openInstallLinkModal(record, rerender, mode) {
     if (!pc().modal) return;
     var item = findInstall(record.id);
     var code = installCode(record) || (item && item.status) || 'preparing';
-    var current = storeInstallLink(record, item);
-    var isEdit = code === 'expired' || code === 'failed';
     var kind = installEmailKind(code);
-    pc().modal(
-      '<div class="modal-head">' + esc(isEdit ? 'Edit install link' : 'Enter install link') + '</div>' +
-      '<div class="modal-body">' +
-        '<label class="fld-label required">Installation link</label>' +
-        '<input class="input" id="opsInstallLink" value="' + esc(isEdit ? current : '') + '" placeholder="https://">' +
-        '<div class="sh-fld-error" id="opsInstallLinkError" hidden></div>' +
-        '<p class="pcx-modal-copy" style="margin-top:10px">Shopify Custom App install links last 7 days. We will email this link to the store.</p>' +
-        '<a class="ops-preview-email" id="opsPreviewEmail" href="' + esc(installEmailPreviewHref(record, kind, isEdit ? current : '')) + '" target="_blank" rel="noopener">Preview email</a>' +
-      '</div>' +
-      '<div class="modal-foot"><button type="button" class="btn btn-default" data-mx>Cancel</button><button type="button" class="btn btn-primary" id="opsSave">' + esc(isEdit ? 'Save and send' : 'Send email') + '</button></div>',
-      function (layer) {
-        var input = layer.querySelector('#opsInstallLink');
-        var error = layer.querySelector('#opsInstallLinkError');
-        var preview = layer.querySelector('#opsPreviewEmail');
-        function syncPreview() {
-          preview.href = installEmailPreviewHref(record, kind, input.value.trim() || (isEdit ? current : ''));
-        }
-        input.oninput = function () {
-          input.classList.remove('has-error');
-          error.hidden = true;
-          error.textContent = '';
-          syncPreview();
-        };
-        layer.querySelector('#opsSave').onclick = function () {
-          var message = validateInstallLink(input.value);
-          if (message) {
+    var currentLink = storeInstallLink(record, item);
+    var clientId = savedClientId(record, item);
+    var replaceMode = mode === 'replace' || !hasAppCredentials(record, item);
+    var previewLink = currentLink || (clientId ? generateAuthorizeLink(record, clientId) : '');
+
+    function credentialFields(idValue, secretValue) {
+      return '<label class="fld-label required">Client ID</label>' +
+        '<input class="input" id="opsClientId" value="' + esc(idValue || '') + '" placeholder="Please enter Client ID" autocomplete="off" spellcheck="false">' +
+        '<div class="sh-fld-error" id="opsClientIdError" hidden></div>' +
+        '<label class="fld-label required" style="margin-top:12px">Client Secret</label>' +
+        '<input class="input" id="opsClientSecret" type="text" value="' + esc(secretValue || '') + '" placeholder="Please enter Client Secret" autocomplete="off" spellcheck="false">' +
+        '<div class="sh-fld-error" id="opsClientSecretError" hidden></div>';
+    }
+
+    if (replaceMode) {
+      var hasSaved = hasAppCredentials(record, item);
+      var savedSecret = savedClientSecret(record, item);
+      var enterCopy = 'Enter this store\'s Custom App Client ID and Secret. We\'ll generate an install link and email it to the store owner. The link is valid for 7 days. You can review the credentials on this store anytime.';
+      var replaceCopy = 'Only replace credentials if this store has a new Custom App. Saving overwrites the current Client ID and Secret, generates a new install link, emails the store owner, and the previous link stops working. The new link is valid for 7 days. If this store is already connected, the merchant must install and authorize again.';
+      pc().modal(
+        '<div class="modal-head">' + esc(hasSaved ? 'Replace app credentials' : 'Enter app credentials') + '</div>' +
+        '<div class="modal-body">' +
+          credentialFields(hasSaved ? clientId : '', hasSaved ? savedSecret : '') +
+          (hasSaved
+            ? '<div class="ops-note ops-warning" style="margin-top:12px">' + replaceCopy + '</div>'
+            : '<p class="pcx-modal-copy" style="margin-top:10px">' + enterCopy + '</p>') +
+          '<a class="ops-preview-email" id="opsPreviewEmail" href="' + esc(installEmailPreviewHref(record, kind, previewLink)) + '" target="_blank" rel="noopener">Preview email</a>' +
+        '</div>' +
+        '<div class="modal-foot"><button type="button" class="btn btn-default" data-mx>Cancel</button><button type="button" class="btn btn-primary" id="opsSave">' + esc(hasSaved ? 'Save and send new link' : 'Send email') + '</button></div>',
+        function (layer) {
+          var idInput = layer.querySelector('#opsClientId');
+          var secretInput = layer.querySelector('#opsClientSecret');
+          var idError = layer.querySelector('#opsClientIdError');
+          var secretError = layer.querySelector('#opsClientSecretError');
+          var preview = layer.querySelector('#opsPreviewEmail');
+          function clearError(input, error) {
+            input.classList.remove('has-error');
+            error.hidden = true;
+            error.textContent = '';
+          }
+          function showError(input, error, message) {
             error.hidden = false;
             error.textContent = message;
             apply(error);
             input.classList.add('has-error');
             input.focus();
-            return;
           }
-          applyInstallLink(record, input.value.trim(), function () {
+          idInput.oninput = function () {
+            clearError(idInput, idError);
+            clearError(secretInput, secretError);
+            preview.href = installEmailPreviewHref(record, kind, idInput.value.trim() ? generateAuthorizeLink(record, idInput.value.trim()) : previewLink);
+          };
+          secretInput.oninput = function () {
+            clearError(idInput, idError);
+            clearError(secretInput, secretError);
+          };
+          layer.querySelector('#opsSave').onclick = function () {
+            var nextId = idInput.value.trim();
+            var nextSecret = secretInput.value.trim();
+            var idMessage = validateClientId(nextId);
+            if (idMessage) { showError(idInput, idError, idMessage); return; }
+            var secretMessage = validateClientSecret(nextSecret, true);
+            if (secretMessage) { showError(secretInput, secretError, secretMessage); return; }
+            if (hasSaved && nextId === clientId && nextSecret === savedSecret) {
+              showError(idInput, idError, 'Credentials are unchanged. Use Resend install link if you only need a new link.');
+              return;
+            }
+            applyGeneratedInstallLink(record, nextId, true, function () {
+              layer.remove();
+              rerender();
+            }, hasSaved ? 'New app credentials saved. Install link emailed to the store.' : '', nextSecret);
+          };
+        }
+      );
+      return;
+    }
+
+    pc().modal(
+      '<div class="modal-head">Resend install link</div>' +
+      '<div class="modal-body">' +
+        '<p class="pcx-modal-copy">We\'ll generate a new install link with the saved app credentials and email it to the store owner. The new link is valid for 7 days.</p>' +
+        '<a class="ops-preview-email" id="opsPreviewEmail" href="' + esc(installEmailPreviewHref(record, 'renew', previewLink)) + '" target="_blank" rel="noopener">Preview email</a>' +
+      '</div>' +
+      '<div class="modal-foot"><button type="button" class="btn btn-default" data-mx>Cancel</button><button type="button" class="btn btn-primary" id="opsSave">Resend email</button></div>',
+      function (layer) {
+        layer.querySelector('#opsSave').onclick = function () {
+          applyGeneratedInstallLink(record, clientId, true, function () {
             layer.remove();
             rerender();
-          });
+          }, 'New install link emailed to the store.');
         };
       }
     );
@@ -646,14 +725,24 @@
   function installLinkFact(record, install) {
     var link = storeInstallLink(record, install);
     var code = installCode(record) || (install && install.status) || '';
-    var action = installLinkAction(code);
+    var action = installLinkAction(code, record, install);
     var value = link
       ? '<span class="ops-install-link i18n-skip">' + esc(link) + '</span><button type="button" class="ops-install-copy" data-copy-install-link="' + esc(link) + '" title="Copy installation link" aria-label="Copy installation link">' + icon('copy', 12) + '</button>'
       : '<span>—</span>';
     var button = action
-      ? '<button type="button" class="btn ' + (code === 'preparing' ? 'btn-primary' : 'btn-default') + ' ops-install-link-btn" data-install-link="' + esc(record.id) + '">' + esc(action) + '</button>'
+      ? '<button type="button" class="btn ' + (code === 'preparing' && !hasAppCredentials(record, install) ? 'btn-primary' : 'btn-default') + ' ops-install-link-btn" data-install-link="' + esc(record.id) + '">' + esc(action) + '</button>'
       : '';
-    return '<div class="ops-install-fact"><span>Installation link</span><strong class="ops-install-value">' + value + '</strong>' + button + '</div>';
+    var replace = hasAppCredentials(record, install)
+      ? '<button type="button" class="ops-preview-email ops-install-link-btn" data-replace-credentials="' + esc(record.id) + '">Replace app credentials</button>'
+      : '';
+    var actions = (button || replace) ? '<div class="ops-install-actions">' + button + replace + '</div>' : '';
+    return '<div class="ops-install-fact"><span>Installation link</span><strong class="ops-install-value">' + value + '</strong>' + actions + '</div>';
+  }
+  function credentialFacts(record, install) {
+    var id = savedClientId(record, install);
+    var secret = savedClientSecret(record, install);
+    return '<div class="ops-credential-fact"><span>Client ID</span><strong class="i18n-skip">' + (id ? esc(id) : '—') + '</strong></div>' +
+      '<div class="ops-credential-fact"><span>Client Secret</span><strong class="i18n-skip">' + (secret ? esc(secret) : '—') + '</strong></div>';
   }
   function installView(record, install) {
     var board = record.onboarding || {};
@@ -859,7 +948,7 @@
       '<div><span>Connected domain</span><strong>' + (connectedDomains.length ? storeOverviewHosts(connectedDomains, isBc ? null : record) : '<span>—</span>') + '</strong></div>' +
       '<div><span>Configured payment providers</span><strong>' + storePaymentText(payments.configured) + '</strong></div>' +
       '<div><span>Active payment providers</span><strong>' + storePaymentText(payments.active) + '</strong></div>' +
-      (isBc ? installLinkFact(record, install) : '<div class="ops-created-fact"><span>Created at</span><strong>' + esc(record.createdAt || '—') + '</strong></div>');
+      (isBc ? credentialFacts(record, install) + installLinkFact(record, install) : '<div class="ops-created-fact"><span>Created at</span><strong>' + esc(record.createdAt || '—') + '</strong></div>');
     var hero = '<section class="ops-panel ops-store-hero"><div class="ops-panel-head"><div><div class="ops-panel-title">Overview</div></div><div class="ops-store-hero-status">' + status(storeStatusLabel(record.lifecycle)) + (storeInstall(record) ? status(storeInstall(record)) : '') + storeSetupTags(storeSetup(record)) + '</div></div><div class="ops-store-hero-main"><div class="ops-store-hero-meta">' +
       '<div><span>Store name</span><strong>' + esc(record.name) + '</strong></div>' +
       '<div><span>Store type</span><strong>' + esc(record.product) + '</strong></div>' +
@@ -919,6 +1008,13 @@
           installLinkBtn.onclick = function (event) {
             event.stopPropagation();
             openInstallLinkModal(record, function () { stores(root, [record.id]); });
+          };
+        }
+        var replaceCredBtn = scope.querySelector('[data-replace-credentials]');
+        if (replaceCredBtn) {
+          replaceCredBtn.onclick = function (event) {
+            event.stopPropagation();
+            openInstallLinkModal(record, function () { stores(root, [record.id]); }, 'replace');
           };
         }
         var copyInstallBtn = scope.querySelector('[data-copy-install-link]');
@@ -1529,12 +1625,14 @@
     var items = [['overview', 'Overview'], ['installs', 'Install links'], ['connections', 'Store connections'], ['routing', 'Routing and safety'], ['writebacks', 'Order writeback'], ['events', 'Events'], ['support', 'Merchant support']];
     return '<nav class="ops-tabs">' + items.map(function (item) { return '<a class="ops-tab' + (active === item[0] ? ' active' : '') + '" href="#/bestcheckout' + (item[0] === 'overview' ? '' : '/' + item[0]) + '">' + item[1] + '</a>'; }).join('') + '</nav>';
   }
-  function installActionLabel(code) {
+  function installActionLabel(code, item) {
+    var store = item ? findStore(item.storeId) : null;
+    if (code === 'preparing' && !hasAppCredentials(store, item)) return 'Enter app credentials';
     return ({
       preparing: 'Send install link',
       ready: 'Record merchant install',
-      expired: 'Generate new install link',
-      failed: 'Send a new install link'
+      expired: 'Resend install link',
+      failed: 'Resend install link'
     })[code] || 'Review install state';
   }
   function syncInstallToStore(item) {
@@ -1568,7 +1666,7 @@
       openInstallLinkModal(store, rerender);
       return;
     }
-    var title = installActionLabel(item.status);
+    var title = installActionLabel(item.status, item);
     confirmDialog(title, 'This records that the merchant completed Install and BestCheckout received the callback. It does not show tokens or Partner Dashboard details.', title, function () {
       item.status = 'connected';
       item.next = 'No action required';
@@ -1597,10 +1695,10 @@
   }
   function bcInstalls(root) {
     var rows = (B.installs || []).map(function (item) {
-      return '<tr><td>' + linkCell(bcStoreName(item.storeId), item.shop, '#/stores/' + item.storeId) + '</td><td>' + status(installLabel(item.status)) + '</td><td class="hide-md">' + esc(item.submittedAt || '—') + '</td><td class="hide-sm">' + esc(item.linkSentAt || 'Not sent') + '</td><td class="hide-xs">' + esc(item.expiresAt || 'After send') + '</td><td><span class="ops-meta">' + esc(item.next) + '</span></td><td>' + (item.status === 'connected' ? '<span class="ops-meta">No action</span>' : '<button class="btn btn-primary" data-install="' + esc(item.id) + '">' + esc(installActionLabel(item.status)) + '</button>') + '</td></tr>';
+      return '<tr><td>' + linkCell(bcStoreName(item.storeId), item.shop, '#/stores/' + item.storeId) + '</td><td>' + status(installLabel(item.status)) + '</td><td class="hide-md">' + esc(item.submittedAt || '—') + '</td><td class="hide-sm">' + esc(item.linkSentAt || 'Not sent') + '</td><td class="hide-xs">' + esc(item.expiresAt || 'After send') + '</td><td><span class="ops-meta">' + esc(item.next) + '</span></td><td>' + (item.status === 'connected' ? '<span class="ops-meta">No action</span>' : '<button class="btn btn-primary" data-install="' + esc(item.id) + '">' + esc(installActionLabel(item.status, item)) + '</button>') + '</td></tr>';
     }).join('');
     var body = bcTabs('installs') +
-      '<div class="ops-note">Shopify Custom App install links last 7 days. Merchant-facing copy: Preparing install link → Ready to install → Connected. Expired or failed links can be regenerated.</div>' +
+      '<div class="ops-note">Operators enter Client ID and Secret. The console generates the install link and emails it to the store owner. Links are valid for 7 days. Resend uses the saved credentials; replace them only for a new app.</div>' +
       '<div class="ops-table-card"><div class="ops-table-wrap"><table class="ops-table"><thead><tr><th>Store</th><th>Install state</th><th class="hide-md">Submitted</th><th class="hide-sm">Link sent</th><th class="hide-xs">Expires</th><th>Next action</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     render(root, page('BestCheckout operations', 'Operate the Custom App install-link state machine. Tokens and Partner Dashboard details stay off this page.', '', body), function (scope) {
       scope.querySelectorAll('[data-install]').forEach(function (button) {
