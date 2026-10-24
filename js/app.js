@@ -36,14 +36,26 @@
     lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
     out: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/>',
     history: '<path d="M3 12a9 9 0 1 0 9-9 9 9 0 0 0-6.36 2.64L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/>',
+    refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+    speed: '<path d="M3 12h4l2.2-5.5L13 17l2.2-5H21"/>',
     check: '<path d="M20 6 9 17l-5-5"/>',
     copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+    billing: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
   };
 
   // ---------- nav ----------
   var NAV = [
     { label: '', items: [
       { id: 'stores', label: 'Stores', icon: P.stores },
+      { id: 'billing', label: 'Billing', icon: P.billing, children: [
+        { id: 'billing-stores', label: 'Store billing', href: '#/billing' },
+        { id: 'billing-prices', label: 'Price books', href: '#/billing/prices' },
+        { id: 'billing-invoices', label: 'Invoices', href: '#/billing/invoices' },
+        { id: 'billing-revenue', label: 'Revenue', href: '#/billing/revenue' }
+      ] },
+      { id: 'speed', label: 'Page speed', icon: P.speed, children: [
+        { id: 'speed-urls', label: 'URL analysis', href: '#/speed/urls' }
+      ] },
       { id: 'content', label: 'Help Center', icon: P.file },
       { id: 'category', label: 'Category', icon: P.category },
       { id: 'attribution', label: 'Attribution', icon: P.attribution },
@@ -802,11 +814,30 @@
 
   // ---------- sidebar + header chrome (mirrors store admin shell.js) ----------
   var navEl;
+  function onSpeedUrls() {
+    var parts = parseHash().parts;
+    return parts[0] === 'speed' && (parts[1] === 'urls' || parts[2] === 'urls');
+  }
+  function billingSubActive(childId) {
+    var parts = parseHash().parts;
+    if (parts[0] !== 'billing') return false;
+    var section = parts[1] || 'stores';
+    if (section !== 'prices' && section !== 'invoices' && section !== 'revenue') section = 'stores';
+    return childId === 'billing-' + section;
+  }
   function renderSidebar(active) {
     navEl.innerHTML = NAV.map(function (group) {
       var groupLabel = group.label ? '<div class="nav-group-label">' + group.label + '</div>' : '';
       var ariaLabel = group.label ? ' aria-label="' + esc(group.label) + '"' : '';
       return '<section class="nav-section"' + ariaLabel + '>' + groupLabel + group.items.map(function (n) {
+        if (n.children && n.children.length) {
+          var open = n.id === active;
+          var subs = n.children.map(function (child) {
+            var subActive = (child.id === 'speed-urls' && onSpeedUrls()) || billingSubActive(child.id);
+            return '<a class="nav-sub' + (subActive ? ' active' : '') + '" href="' + child.href + '">' + child.label + '</a>';
+          }).join('');
+          return '<div class="nav-group"><a class="nav-item' + (open ? ' active' : '') + '" href="#/' + n.id + '">' + navico(n.icon) + '<span>' + n.label + '</span></a><div class="nav-subs' + (open ? '' : ' collapsed') + '">' + subs + '</div></div>';
+        }
         return '<a class="nav-item' + (n.id === active ? ' active' : '') + '" href="#/' + n.id + '">' + navico(n.icon) + '<span>' + n.label + '</span></a>';
       }).join('') + '</section>';
     }).join('');
@@ -839,7 +870,16 @@
     return parseHash().parts[0] === 'install-email-preview';
   }
 
+  var currentHash = '';
+  var previousHash = '';
+  function rememberHash() {
+    var next = location.hash || '';
+    if (!next || next === currentHash) return;
+    previousHash = currentHash;
+    currentHash = next;
+  }
   function dispatch() {
+    rememberHash();
     var parsed = parseHash();
     var parts = parsed.parts;
     var id = parts[0] || 'action-center';
@@ -865,7 +905,8 @@
     var route = window.SAAS_PAGE_MANIFEST && window.SAAS_PAGE_MANIFEST.find(id);
     if (!route || typeof route.render !== 'function') { location.replace('#/action-center'); return; }
     route.render(root, parts);
-    root.scrollTop = 0;
+    var scroller = document.getElementById('view');
+    if (scroller) scroller.scrollTop = 0;
   }
 
   function build() {
@@ -922,6 +963,9 @@
     account: viewAccount,
     menu: viewMenu,
     category: viewCategory
+  };
+  window.SAAS_NAV = {
+    previous: function () { return previousHash; }
   };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', build);

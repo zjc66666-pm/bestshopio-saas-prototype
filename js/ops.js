@@ -87,8 +87,9 @@
   function linkCell(title, meta, href) {
     return '<a class="ops-row-link" href="' + esc(href) + '"><strong>' + esc(title) + '</strong>' + (meta ? '<span>' + esc(meta) + '</span>' : '') + '</a>';
   }
-  function page(title, sub, actions, body, crumb, backTo) {
-    var pageClass = title === 'Help Center' ? ' ops-page-help-center' : (title === 'Stores' ? ' ops-page-stores' : (backTo === '#/stores' ? ' ops-page-store-detail' : ''));
+  function page(title, sub, actions, body, crumb, backTo, kind) {
+    var listLayout = title === 'Stores' || title === 'Store billing' || title === 'Price books' || title === 'Invoices' || title === 'Revenue';
+    var pageClass = title === 'Help Center' ? ' ops-page-help-center' : (listLayout ? ' ops-page-stores' : (kind === 'store-detail' ? ' ops-page-store-detail' : ''));
     var titleBlock = '<div class="ops-page-title-block"><h1 class="ops-title page-title">' + esc(title) + '</h1>' +
       (sub ? '<div class="ops-sub">' + esc(sub) + '</div>' : '') + '</div>';
     var titleRow = backTo
@@ -266,7 +267,7 @@
     var active = stores.filter(function (x) { return x.lifecycle === 'Active'; }).length;
     var liveHosts = hosts.filter(function (x) { return x.status === 'Live'; }).length;
     var published = articles.filter(function (x) { return x.status === 'Published'; }).length;
-    var queue = attention.slice(0, 5).map(function (item) {
+    var queue = attention.slice(0, 4).map(function (item) {
       var level = String(item.severity || '').toLowerCase();
       return '<button class="ops-attention-item" data-task="' + esc(item.id) + '"><i class="ops-severity ' + esc(level) + '"></i><div class="ops-attention-copy"><strong>' + esc(item.title) + '</strong><span>' + esc(item.store) + ' · ' + esc(item.detail) + '</span></div>' + status(item.state) + '</button>';
     }).join('');
@@ -277,7 +278,7 @@
       ['Help Center', published + ' published articles · 1 in review', 'Healthy']
     ].map(function (row) { return '<div class="ops-health-row"><div><strong>' + row[0] + '</strong><span>' + row[1] + '</span></div>' + status(row[2]) + '</div>'; }).join('');
     var recent = (C.audit || []).slice(0, 4).map(function (item) {
-      return '<div class="ops-timeline-row"><div><strong>' + esc(item.action) + '</strong><span>' + esc(item.scope) + ' · ' + esc(item.actor) + '</span></div><span class="ops-meta">' + esc(item.at) + '</span></div>';
+      return '<div class="ops-timeline-row"><div><strong>' + esc(item.action) + '</strong><span><span>' + esc(item.scope) + '</span> · ' + esc(item.actor) + '</span></div><span class="ops-meta">' + esc(item.at) + '</span></div>';
     }).join('');
     var body = '<div class="ops-kpi-grid">' +
       kpi('Active stores', active, 'Across BestShopio and BestCheckout', '') +
@@ -287,7 +288,7 @@
       '<div class="ops-layout"><div class="ops-stack"><section class="ops-panel"><div class="ops-panel-head"><div><div class="ops-panel-title">Items requiring attention</div><div class="ops-panel-sub">Prioritized operational work across stores and platform services.</div></div><a class="ops-link" href="#/stores">View stores</a></div><div class="ops-attention">' + queue + '</div></section>' +
       '<section class="ops-panel"><div class="ops-panel-head"><div><div class="ops-panel-title">Recent changes</div><div class="ops-panel-sub">Recorded platform actions and releases.</div></div><a class="ops-link" href="#/governance">Release management</a></div><div class="ops-panel-body">' + recent + '</div></section></div>' +
       '<aside class="ops-stack"><section class="ops-panel"><div class="ops-panel-head"><div><div class="ops-panel-title">Platform health</div><div class="ops-panel-sub">A concise service view; use each module for diagnosis.</div></div></div><div class="ops-panel-body">' + health + '</div></section>' +
-      '<section class="ops-panel"><div class="ops-panel-head"><div><div class="ops-panel-title">Quick access</div></div></div><div class="ops-panel-body"><div class="ops-action-list"><a class="btn btn-default" href="#/content">Manage Help Center</a><a class="btn btn-default" href="#/bestcheckout">BestCheckout operations</a><a class="btn btn-default" href="#/domains">Review domains</a></div></div></section></aside></div>';
+      '<section class="ops-panel"><div class="ops-panel-head"><div><div class="ops-panel-title">Quick access</div></div></div><div class="ops-panel-body"><div class="ops-action-list"><a class="btn btn-default" href="#/speed">Review page speed</a><a class="btn btn-default" href="#/content">Manage Help Center</a><a class="btn btn-default" href="#/bestcheckout">BestCheckout operations</a><a class="btn btn-default" href="#/domains">Review domains</a></div></div></section></aside></div>';
     render(root, page('Operations overview', 'Run the shared platform safely: stores, merchant organizations, content, domains, service connections and governed releases.', '<a class="btn btn-primary" href="#/stores">Manage stores</a>', body));
     root.querySelectorAll('[data-task]').forEach(function (button) { button.onclick = function () { route('#/tasks/' + button.getAttribute('data-task')); }; });
   }
@@ -934,6 +935,11 @@
       return '<tr data-store="' + esc(item.id) + '"><td>' + storeNameCell(item) + '</td><td class="hide-md">' + esc(item.product) + '</td><td>' + status(storeStatusLabel(item.lifecycle)) + '</td><td class="hide-sm">' + statusOrDash(storeInstall(item)) + '</td><td class="hide-xs">' + storeSetupTags(setup) + '</td><td><a class="ops-act" href="#/stores/' + esc(item.id) + '" title="View" aria-label="View">' + icon('eye', 16) + '</a></td></tr>';
     }).join('');
   }
+  function storeReturnHref() {
+    var prev = window.SAAS_NAV && window.SAAS_NAV.previous ? window.SAAS_NAV.previous() : '';
+    if (!prev || prev === location.hash) return '#/stores';
+    return prev;
+  }
   function storeDetail(root, id) {
     var record = findStore(id);
     if (!record) { stores(root, []); return; }
@@ -1001,7 +1007,8 @@
     var timeline = onboardPanel(record, install);
     var extra = usagePanel + syncPanel;
     var body = '<div class="ops-store-detail">' + hero + timeline + kpis + (extra ? '<div class="ops-layout ops-layout-single"><div class="ops-stack">' + extra + '</div></div>' : '') + '</div>';
-    render(root, page(record.name, '', '', body, '', '#/stores'),
+    var billingAction = isBc ? '<a class="btn btn-default" href="#/billing/stores/' + esc(record.id) + '">Billing</a>' : '';
+    render(root, page(record.name, '', billingAction, body, '', storeReturnHref(), 'store-detail'),
       function (scope) {
         var installLinkBtn = scope.querySelector('[data-install-link]');
         if (installLinkBtn) {

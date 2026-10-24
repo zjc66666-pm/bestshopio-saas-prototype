@@ -51,7 +51,11 @@
     if (top + ph > window.innerHeight - 8) top = Math.max(8, r.top - 6 - ph); // flip up
     panel.style.top = top + 'px';
     panel.style.left = left + 'px';
-    layer._close = closePop;
+    layer._close = function (e) {
+      var target = e && e.target;
+      if (e && e.type === 'scroll' && target && target.nodeType === 1 && panel.contains(target)) return;
+      closePop();
+    };
     layer._out = function (e) { if (!panel.contains(e.target) && !anchor.contains(e.target)) closePop(); };
     setTimeout(function () { document.addEventListener('mousedown', layer._out, true); }, 0);
     window.addEventListener('resize', layer._close, true);
@@ -103,10 +107,10 @@
       if (openLayer && openLayer._owner === btn) { closePop(); return; }
       var panel = document.createElement('div');
       panel.className = 'ui-select-pop';
-      if (sel.hasAttribute('data-ui-match-width')) {
+      if (sel.hasAttribute('data-ui-match-width') || sel.hasAttribute('data-ui-hug')) {
         panel.style.boxSizing = 'border-box';
-        panel.style.width = btn.offsetWidth + 'px';
-        panel.style.minWidth = '0';
+        panel.style.width = sel.hasAttribute('data-ui-hug') ? 'max-content' : (btn.offsetWidth + 'px');
+        panel.style.minWidth = sel.hasAttribute('data-ui-hug') ? (btn.offsetWidth + 'px') : '0';
       } else panel.style.minWidth = Math.max(btn.offsetWidth, 160) + 'px';
       Array.prototype.forEach.call(sel.options, function (o, i) {
         var opt = document.createElement('div');

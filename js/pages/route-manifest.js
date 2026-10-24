@@ -26,6 +26,7 @@
 
   var routes = [
     { id: 'action-center', prototypeSource: 'js/ops.js#home', nextRoute: 'pages/index.tsx', targetModule: 'src/pages/saas-operations-overview', render: ops('home') },
+    { id: 'speed', prototypeSource: 'js/pages/speed.js', nextRoute: 'pages/speed/[[...parts]].tsx', targetModule: 'src/pages/saas-page-speed', render: function (root, parts) { if (window.SAAS_SPEED) window.SAAS_SPEED.render(root, (parts || []).slice(1)); } },
     { id: 'tasks', prototypeSource: 'js/ops.js#task', nextRoute: 'pages/tasks/[taskId].tsx', targetModule: 'src/pages/saas-operation-task', render: function (root, parts) { ops('task', parts && parts[1])(root); } },
     { id: 'stores', prototypeSource: 'js/ops.js#stores', nextRoute: 'pages/stores/[[...parts]].tsx', targetModule: 'src/pages/saas-stores', render: function (root, parts) { ops('stores', (parts || []).slice(1))(root); } },
     { id: 'organizations', prototypeSource: 'js/ops.js#organizations', nextRoute: 'pages/organizations/[[...parts]].tsx', targetModule: 'src/pages/saas-organizations', render: function (root, parts) { ops('organizations', (parts || []).slice(1))(root); } },
@@ -33,6 +34,7 @@
     { id: 'domains', prototypeSource: 'js/ops.js#domains', nextRoute: 'pages/domains/[[...parts]].tsx', targetModule: 'src/pages/saas-domains', render: function (root, parts) { ops('domains', (parts || []).slice(1))(root); } },
     { id: 'integrations', prototypeSource: 'js/ops.js#integrations', nextRoute: 'pages/integrations/[[...parts]].tsx', targetModule: 'src/pages/saas-integrations', render: function (root, parts) { ops('integrations', (parts || []).slice(1))(root); } },
     { id: 'plans', prototypeSource: 'js/ops.js#plans', nextRoute: 'pages/plans/[[...parts]].tsx', targetModule: 'src/pages/saas-plans', render: function (root, parts) { ops('plans', (parts || []).slice(1))(root); } },
+    { id: 'billing', prototypeSource: 'js/pages/billing.js', nextRoute: 'pages/billing/[[...parts]].tsx', targetModule: 'src/pages/saas-billing', render: function (root, parts) { if (window.SAAS_BILLING) window.SAAS_BILLING.render(root, (parts || []).slice(1)); } },
     { id: 'governance', prototypeSource: 'js/ops.js#governance', nextRoute: 'pages/governance/[[...parts]].tsx', targetModule: 'src/pages/saas-release-management', render: function (root, parts) { ops('governance', (parts || []).slice(1))(root); } },
     { id: 'account', prototypeSource: 'js/app.js#viewAccount', nextRoute: 'pages/account/index.tsx', targetModule: 'src/pages/saas-account', render: system('account') },
     { id: 'menu', prototypeSource: 'js/app.js#viewMenu', nextRoute: 'pages/menu/index.tsx', targetModule: 'src/pages/saas-menu', render: system('menu') },

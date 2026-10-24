@@ -40,7 +40,8 @@ body { font-size: 14px; line-height: 1.5; color: var(--ink); }
 .nav-ico { width: 18px; height: 18px; flex: 0 0 18px; color: var(--ink-muted); }
 .nav-badge { margin-left: auto; font-size: 12px; color: var(--ink-muted); }
 .nav-item.active .nav-badge { color: var(--brand); }
-.nav-sub { display: flex; align-items: center; gap: 10px; padding: 7px 10px 7px 38px; border-radius: var(--radius); color: var(--ink-body); font-size: 13.5px; cursor: pointer; }
+.nav-subs { display: flex; flex-direction: column; gap: 2px; padding: 4px 0 8px; }
+.nav-sub { display: flex; align-items: center; gap: 10px; padding: 7px 10px 7px 38px; border-radius: var(--radius); color: var(--ink-body); font-size: 13.5px; cursor: pointer; text-decoration: none; }
 .nav-sub:hover { background: var(--panel); }
 .nav-sub.active { background: #e6f0ff; color: var(--brand); font-weight: 600; }
 .nav-caret { margin-left: auto; transition: transform .15s; color: var(--ink-muted); }
