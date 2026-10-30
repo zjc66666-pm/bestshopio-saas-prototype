@@ -1205,7 +1205,7 @@
       return;
     }
     if (!account) {
-      var empty = '<div class="ops-empty"><strong>Billing has not started</strong><p><span>This store is still opening.</span> <span>It uses the default price book, including that price book’s free allowance, until someone assigns another.</span></p><p class="i18n-skip">' + esc(defaultBook().name) + ' · ' + esc(allowanceLabel(defaultBook().allowanceCents)) + '</p></div>';
+      var empty = '<div class="ops-empty ops-empty-panel"><strong>Billing has not started</strong><p><span>This store is still opening.</span> <span>It uses the default price book, including that price book’s free allowance, until someone assigns another.</span></p></div>';
       face.render(root, face.page(store.name, 'No invoice is issued before the store is Active.', '', empty, '', '#/billing'));
       return;
     }
