@@ -131,7 +131,7 @@
     return '<article class="attribution-guide-step"><div class="speed-metric-name"><span class="attribution-guide-step-number">' + esc(name) + '</span><h3>' + esc(title) + '</h3></div><p>' + esc(copy) + '</p></article>';
   }
   function metricGuide() {
-    var details = '<div class="attribution-guide-details"><p class="speed-metric-lead">Average from real visitors. A higher number is worse. Experience uses the worst of LCP, INP and CLS.</p><div class="attribution-guide-flow">' +
+    var details = '<div class="attribution-guide-details"><p class="speed-metric-lead">Average from real visitors. A higher number is worse. Experience uses the worst of LCP, INP, CLS, FCP and TTFB.</p><div class="attribution-guide-flow">' +
       metricGuideCard('LCP', 'Largest content', 'Largest visible element. Good at 2.5 s or faster, needs improvement until 4 s.') +
       metricGuideCard('INP', 'Interaction response', 'Response after a tap or click. Good at 200 ms or faster, needs improvement until 500 ms.') +
       metricGuideCard('CLS', 'Visual stability', 'How far the page shifts. Not a time. Good at 0.10 or lower, needs improvement until 0.25.') +
@@ -608,7 +608,7 @@
   }
   function metricCells(rows) {
     var total = rows.reduce(function (sum, row) { return sum + samplesOf(row); }, 0);
-    var ratings = metricOrder.slice(0, 3).map(function (name) {
+    var ratings = metricOrder.map(function (name) {
       return summarize(rows, name);
     }).filter(function (summary) { return summary && !summary.insufficient; }).map(function (summary) {
       return summary.rating;
@@ -921,7 +921,10 @@
           country: row.country,
           device: row.device,
           metrics: metrics,
-          rating: worst(metricOrder.slice(0, 3).map(function (name) { return rateOne(name, metrics[name]); }))
+          rating: (function () {
+            var rated = metricOrder.filter(function (name) { return metrics[name] != null && isFinite(metrics[name]); }).map(function (name) { return rateOne(name, metrics[name]); });
+            return rated.length ? worst(rated) : 'insufficient';
+          })()
         });
       }
     });
