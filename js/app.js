@@ -47,8 +47,7 @@
   var NAV = [
     { label: '', items: [
       { id: 'stores', label: 'Stores', icon: P.stores },
-      { id: 'billing', label: 'Billing', icon: P.billing, children: [
-        { id: 'billing-stores', label: 'Store billing', href: '#/billing' },
+      { id: 'billing', label: 'BestCheckout billing', icon: P.billing, children: [
         { id: 'billing-prices', label: 'Price books', href: '#/billing/prices' },
         { id: 'billing-invoices', label: 'Invoices', href: '#/billing/invoices' },
         { id: 'billing-revenue', label: 'Revenue', href: '#/billing/revenue' }
@@ -821,8 +820,8 @@
   function billingSubActive(childId) {
     var parts = parseHash().parts;
     if (parts[0] !== 'billing') return false;
-    var section = parts[1] || 'stores';
-    if (section !== 'prices' && section !== 'invoices' && section !== 'revenue') section = 'stores';
+    var section = parts[1] || '';
+    if (section !== 'prices' && section !== 'invoices' && section !== 'revenue') return false;
     return childId === 'billing-' + section;
   }
   function renderSidebar(active) {
@@ -867,7 +866,8 @@
     return { parts: path.split('/').filter(Boolean), query: query };
   }
   function isInstallEmailPreview() {
-    return parseHash().parts[0] === 'install-email-preview';
+    var part = parseHash().parts[0];
+    return part === 'install-email-preview' || part === 'billing-email-preview';
   }
 
   var currentHash = '';
@@ -888,7 +888,9 @@
       document.body.classList.add('is-email-preview');
       var app = document.getElementById('app');
       app.className = '';
-      if (window.SAAS_OPS && typeof window.SAAS_OPS.installEmailPreview === 'function') {
+      if (parts[0] === 'billing-email-preview' && window.SAAS_BILLING && typeof window.SAAS_BILLING.emailPreview === 'function') {
+        window.SAAS_BILLING.emailPreview(app, parsed.query);
+      } else if (window.SAAS_OPS && typeof window.SAAS_OPS.installEmailPreview === 'function') {
         window.SAAS_OPS.installEmailPreview(app, parsed.query);
       }
       return;

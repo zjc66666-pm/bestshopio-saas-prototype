@@ -52,7 +52,7 @@
     var text = String(value || '').toLowerCase();
     if (/preparing install link|正在准备安装链接/.test(text)) return 'action';
     if (/domain not connected|payment not connected|域名未连接|支付未连接/.test(text)) return 'warn';
-    if (/failed|suspend|action required|needs attention|blocked|reauthorization|retryable|merchant action|not connected|not verified|disabled|expired|install failed/.test(text)) return 'danger';
+    if (/failed|suspend|action required|needs attention|blocked|reauthorization|retryable|merchant action|not connected|not verified|disabled|expired|overdue|install failed/.test(text)) return 'danger';
     if (/review|pending|provision|progress|waiting|sending to shopify|pilot|queued|draft|open|ready to install|setup incomplete|not completed|开通|opening|未完成/.test(text)) return 'warn';
     if (/paused|not configured|archived|hidden|none/.test(text)) return 'muted';
     return 'ok';
@@ -88,7 +88,7 @@
     return '<a class="ops-row-link" href="' + esc(href) + '"><strong>' + esc(title) + '</strong>' + (meta ? '<span>' + esc(meta) + '</span>' : '') + '</a>';
   }
   function page(title, sub, actions, body, crumb, backTo, kind) {
-    var listLayout = title === 'Stores' || title === 'Store billing' || title === 'Price books' || title === 'Invoices' || title === 'Revenue';
+    var listLayout = title === 'Stores' || title === 'BestCheckout billing' || title === 'Price books' || title === 'Invoices' || title === 'Revenue';
     var pageClass = title === 'Help Center' ? ' ops-page-help-center' : (listLayout ? ' ops-page-stores' : (kind === 'store-detail' ? ' ops-page-store-detail' : ''));
     var titleBlock = '<div class="ops-page-title-block"><h1 class="ops-title page-title">' + esc(title) + '</h1>' +
       (sub ? '<div class="ops-sub">' + esc(sub) + '</div>' : '') + '</div>';
@@ -333,6 +333,15 @@
   function storeInstall(item) {
     if (item.type !== 'bestcheckout' && !installCode(item)) return '';
     return installLabel(installCode(item) || 'preparing');
+  }
+  function storeColumnCode(item) {
+    if (item.holdReason) return 'overdue';
+    if (item.type !== 'bestcheckout' && !installCode(item)) return '';
+    return installCode(item) || 'preparing';
+  }
+  function storeColumnLabel(item) {
+    if (item.holdReason) return item.holdReason;
+    return storeInstall(item);
   }
   function storeSetup(item) {
     var connected = item.type !== 'bestcheckout' || isShopifyConnected(item);
@@ -932,7 +941,7 @@
     if (!list.length) return listEmpty('No stores match these filters.');
     return list.map(function (item) {
       var setup = storeSetup(item);
-      return '<tr data-store="' + esc(item.id) + '"><td>' + storeNameCell(item) + '</td><td class="hide-md">' + esc(item.product) + '</td><td>' + status(storeStatusLabel(item.lifecycle)) + '</td><td class="hide-sm">' + statusOrDash(storeInstall(item)) + '</td><td class="hide-xs">' + storeSetupTags(setup) + '</td><td><a class="ops-act" href="#/stores/' + esc(item.id) + '" title="View" aria-label="View">' + icon('eye', 16) + '</a></td></tr>';
+      return '<tr data-store="' + esc(item.id) + '"><td>' + storeNameCell(item) + '</td><td class="hide-md">' + esc(item.product) + '</td><td>' + status(storeStatusLabel(item.lifecycle)) + '</td><td class="hide-sm">' + statusOrDash(storeColumnLabel(item)) + '</td><td class="hide-xs">' + storeSetupTags(setup) + '</td><td><a class="ops-act" href="#/stores/' + esc(item.id) + '" title="View" aria-label="View">' + icon('eye', 16) + '</a></td></tr>';
     }).join('');
   }
   function storeReturnHref() {
@@ -951,11 +960,11 @@
     var email = storeEmail(record);
     var setupFacts =
       '<div><span>Email</span><strong>' + (email ? '<span class="i18n-skip">' + esc(email) + '</span>' : '<span>—</span>') + '</strong></div>' +
-      '<div><span>Connected domain</span><strong>' + (connectedDomains.length ? storeOverviewHosts(connectedDomains, isBc ? null : record) : '<span>—</span>') + '</strong></div>' +
+      '<div><span>Connected domain</span><strong>' + (connectedDomains.length ? storeOverviewHosts(connectedDomains, record) : '<span>—</span>') + '</strong></div>' +
       '<div><span>Configured payment providers</span><strong>' + storePaymentText(payments.configured) + '</strong></div>' +
       '<div><span>Active payment providers</span><strong>' + storePaymentText(payments.active) + '</strong></div>' +
       (isBc ? credentialFacts(record, install) + installLinkFact(record, install) : '<div class="ops-created-fact"><span>Created at</span><strong>' + esc(record.createdAt || '—') + '</strong></div>');
-    var hero = '<section class="ops-panel ops-store-hero"><div class="ops-panel-head"><div><div class="ops-panel-title">Overview</div></div><div class="ops-store-hero-status">' + status(storeStatusLabel(record.lifecycle)) + (storeInstall(record) ? status(storeInstall(record)) : '') + storeSetupTags(storeSetup(record)) + '</div></div><div class="ops-store-hero-main"><div class="ops-store-hero-meta">' +
+    var hero = '<section class="ops-panel ops-store-hero"><div class="ops-panel-head"><div><div class="ops-panel-title">Overview</div></div><div class="ops-store-hero-status">' + status(storeStatusLabel(record.lifecycle)) + (storeColumnLabel(record) ? status(storeColumnLabel(record)) : '') + storeSetupTags(storeSetup(record)) + '</div></div><div class="ops-store-hero-main"><div class="ops-store-hero-meta">' +
       '<div><span>Store name</span><strong>' + esc(record.name) + '</strong></div>' +
       '<div><span>Store type</span><strong>' + esc(record.product) + '</strong></div>' +
       '<div><span>Shop ID</span><strong>' + esc(storeShopId(record) || '—') + '</strong></div>' +
@@ -1070,6 +1079,7 @@
       { value: 'expired', label: 'Install link expired' },
       { value: 'failed', label: 'Install failed' },
       { value: 'reauth', label: 'Reauthorization needed' },
+      { value: 'overdue', label: 'Invoice overdue' },
       { value: 'connected', label: 'Connected' }
     ];
     var setupOptions = [
@@ -1083,9 +1093,9 @@
       '<span class="ops-search"><input id="storeSearch" placeholder="Search">' + icon('search', 16) + '</span></div>' +
       multiCheckHtml('storeProduct', 'All store types', typeOptions) +
       multiCheckHtml('storeLifecycle', 'All store statuses', statusOptions) +
-      multiCheckHtml('storeInstall', 'All install statuses', installOptions) +
+      multiCheckHtml('storeInstall', 'All status details', installOptions) +
       multiCheckHtml('storeSetup', 'All setup statuses', setupOptions) +
-      '<div class="ops-filter-tags" id="storeFilterTags"></div></div><div class="ops-table-wrap"><table class="ops-table ops-table-stores"><thead><tr><th>Store</th><th class="hide-md">Store type</th><th>Store status</th><th class="hide-sm">Install</th><th class="hide-xs">Setup</th><th>Action</th></tr></thead><tbody id="storeRows"></tbody></table></div>' +
+      '<div class="ops-filter-tags" id="storeFilterTags"></div></div><div class="ops-table-wrap"><table class="ops-table ops-table-stores"><thead><tr><th>Store</th><th class="hide-md">Store type</th><th>Store status</th><th class="hide-sm">Status detail</th><th class="hide-xs">Setup</th><th>Action</th></tr></thead><tbody id="storeRows"></tbody></table></div>' +
       '<div class="ops-table-foot"><span class="ops-table-total" id="storeTotal">Total 0 records</span><div class="pg" id="storePagination"></div></div></div>';
     render(root, page('Stores', '', '', body), function (scope) {
       var pageNo = 1;
@@ -1113,7 +1123,7 @@
         if (query) tags.push(filterTag('keyword', fieldLabel, [query]));
         if (selectedTypes.length) tags.push(filterTag('type', 'Store type', selectedTypes.map(function (value) { return optionLabel(typeOptions, value); })));
         if (selectedStatuses.length) tags.push(filterTag('status', 'Store status', selectedStatuses.map(function (value) { return optionLabel(statusOptions, value); })));
-        if (selectedInstalls.length) tags.push(filterTag('install', 'Install', selectedInstalls.map(function (value) { return optionLabel(installOptions, value); })));
+        if (selectedInstalls.length) tags.push(filterTag('install', 'Status detail', selectedInstalls.map(function (value) { return optionLabel(installOptions, value); })));
         if (selectedSetup.length) tags.push(filterTag('setup', 'Setup', selectedSetup.map(function (value) { return optionLabel(setupOptions, value); })));
         tagsEl.innerHTML = tags.join('');
         if (window.I18N && window.I18N.apply) window.I18N.apply(tagsEl);
@@ -1126,8 +1136,7 @@
       }
       function storeMatchesInstall(item) {
         if (!selectedInstalls.length) return true;
-        var code = storeInstall(item) ? installCode(item) || 'preparing' : '';
-        return selectedInstalls.indexOf(code) >= 0;
+        return selectedInstalls.indexOf(storeColumnCode(item)) >= 0;
       }
       function storeMatchesSetup(item) {
         if (!selectedSetup.length) return true;
@@ -1170,7 +1179,7 @@
       bindSearch(scope, '#storeSearch', ['#storeSearchField'], draw);
       bindMultiCheck(scope, 'storeProduct', 'All store types', typeOptions, selectedTypes, draw, multiState);
       bindMultiCheck(scope, 'storeLifecycle', 'All store statuses', statusOptions, selectedStatuses, draw, multiState);
-      bindMultiCheck(scope, 'storeInstall', 'All install statuses', installOptions, selectedInstalls, draw, multiState);
+      bindMultiCheck(scope, 'storeInstall', 'All status details', installOptions, selectedInstalls, draw, multiState);
       bindMultiCheck(scope, 'storeSetup', 'All setup statuses', setupOptions, selectedSetup, draw, multiState);
       scope.querySelector('#storeFilterTags').onclick = function (event) {
         var pill = event.target.closest('[data-clear-store]');
