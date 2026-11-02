@@ -19,6 +19,9 @@
       { label: 'Launch credit', reason: 'One-time launch credit', amountCents: -50000 }
     ], true),
     account('shop_heyjune', 'Hey June', 'Hey June Co.', 'june@heyjune.co', 'Active', 'standard', 'Mastercard', '5510', 33800000, 2100, 900, 4200000, 180, 22, [], false),
+    account('shop_kiln', 'Kiln Coffee', 'Kiln Coffee Co.', 'hello@kilncoffee.co', 'Active', 'standard', 'Mastercard', '8888', 22000000, 1100, 90, 3500000, 140, 18, [], false),
+    account('shop_plover', 'Plover Studio', 'Plover Studio LLC', 'hello@ploverstudio.com', 'Active', 'standard', '', '', 0, 0, 0, 1800000, 60, 4, [], false),
+    account('shop_bramble', 'Bramble Market', 'Bramble Market LLC', 'hello@bramblemarket.com', 'Active', 'standard', 'Visa', '2614', 0, 0, 0, 420000, 16, 1, [], false),
     account('shop_coral', 'Coral Goods', 'Coral Goods Ltd.', 'lena@coral-goods.demo', 'Active', 'standard', 'Visa', '2204', 0, 0, 0, 0, 0, 0, [], false),
     account('shop_river', 'River Remedy', 'River Remedy Ltd.', 'riley@riverremedy.com', 'Suspended', 'standard', 'Visa', '7731', 0, 0, 0, 0, 0, 0, [], false),
     account('shop_pine', 'Pine & Wick', 'Pine & Wick LLC', 'billing@pine-wick.demo', 'Suspended', 'standard', 'Visa', '6620', 8600000, 380, 20, 0, 0, 0, [], false),
@@ -27,11 +30,15 @@
     account('shop_marlow', 'Marlow Supply', 'Marlow Supply LLC', 'owen@marlowsupply.com', 'Active', 'standard', 'Visa', '4412', 8600000, 410, 18, 0, 0, 0, [], false),
     account('shop_sable', 'Sable Home', 'Sable Home LLC', 'billing@sable-home.demo', 'Active', 'standard', 'Visa', '9031', 0, 0, 0, 4000000, 120, 0, [], false),
     account('shop_northline', 'Northline Goods', 'Northline Goods LLC', 'ops@northlinegoods.co', 'Active', 'standard', 'Visa', '5454', 18000000, 920, 70, 9200000, 410, 28, [], false),
-    account('shop_linden', 'Linden Goods', 'Linden Goods LLC', 'billing@lindengoods.co', 'Active', 'standard', 'Visa', '4141', 9600000, 480, 30, 5400000, 240, 16, [], false)
+    account('shop_linden', 'Linden Goods', 'Linden Goods LLC', 'billing@lindengoods.co', 'Active', 'standard', 'Visa', '4141', 9600000, 480, 30, 5400000, 240, 16, [], false),
+    account('shop_maple', 'Maple Goods', 'Maple Goods LLC', 'hello@maplegoods.co', 'Active', 'standard', '', '', 4000000, 160, 8, 800000, 30, 2, [], false)
   ];
   settle(findAccount('shop_lavender'), { allowance: 2500000, used: true, card: true, sepDays: 30, octDays: 31, sepStatus: 'Paid', sepPaid: 'Oct 2, 2026' });
   settle(findAccount('shop_folast'), { allowance: null, used: false, card: true, sepDays: 0, octDays: 0 });
   settle(findAccount('shop_heyjune'), { allowance: 2500000, used: true, card: false, sepDays: 30, octDays: 7, sepStatus: 'Past due', sepPaid: '', fallback: true, fallbackOn: 'Oct 8, 2026' });
+  settle(findAccount('shop_kiln'), { allowance: 2500000, used: true, card: true, sepDays: 30, octDays: 0, sepStatus: 'Past due', sepPaid: '', fallback: true, fallbackOn: 'Oct 9, 2026' });
+  settle(findAccount('shop_plover'), { allowance: null, used: false, card: false, sepDays: 0, octDays: 0, custom: true });
+  settle(findAccount('shop_bramble'), { allowance: 2500000, used: false, card: true, sepDays: 0, octDays: 0 });
   settle(findAccount('shop_coral'), { allowance: 1000000, used: false, card: false, sepDays: 0, octDays: 0, custom: true });
   settle(findAccount('shop_river'), { allowance: 2500000, used: false, card: true, sepDays: 0, octDays: 0 });
   settle(findAccount('shop_pine'), { allowance: 2500000, used: true, card: true, sepDays: 30, octDays: 0, sepStatus: 'Paid', sepPaid: 'Oct 2, 2026' });
@@ -48,6 +55,7 @@
   settle(findAccount('shop_sable'), { allowance: 2500000, used: true, card: true, sepDays: 0, octDays: 21 });
   settle(findAccount('shop_northline'), { allowance: 2500000, used: true, card: true, sepDays: 30, octDays: 31, sepStatus: 'Paid', sepPaid: 'Oct 2, 2026' });
   settle(findAccount('shop_linden'), { allowance: 2500000, used: true, card: true, sepDays: 30, octDays: 31, sepStatus: 'Paid', sepPaid: 'Oct 2, 2026' });
+  settle(findAccount('shop_maple'), { allowance: 2500000, used: true, card: false, sepDays: 30, octDays: 31, sepStatus: 'Paid', sepPaid: 'Oct 2, 2026' });
   var sable = findAccount('shop_sable');
   sable.october.overflowCents = 1500000;
   var sableInvoice = makeInvoice(sable.store, storeShopId(sable.storeId), '2026-10', '2026.10', bookById('standard'), 1500000, sable.october.approvals, 0, [], 'Past due', '', 21, 31);
@@ -103,6 +111,7 @@
   var quillSeptember = findAccount('shop_quill').invoices.filter(function (item) { return item.monthKey === '2026-09'; })[0];
   var mossInvoice = findAccount('shop_moss').invoices[0];
   var lindenInvoice = findAccount('shop_linden').invoices[0];
+  var mapleInvoice = findAccount('shop_maple').invoices[0];
   function invoiceMoneyLog(invoice, cents) {
     return '<span class="i18n-skip">' + esc(invoice.number + ' · ' + money(cents)) + '</span>';
   }
@@ -132,6 +141,11 @@
   logLine('2026-10-03 09:00', 'BestCheckout', 'Charge retry failed', 'shop_heyjune', heyInvoice.id, '<span>Status unchanged</span>');
   logLine('2026-10-01 00:12', 'BestCheckout', 'Emailed the owner', 'shop_heyjune', heyInvoice.id, 'No card on file');
   logLine('2026-10-01 00:05', 'BestCheckout', 'Issued invoice', 'shop_heyjune', heyInvoice.id, moneyLog(heyInvoice.totalCents));
+  var kilnInvoice = findAccount('shop_kiln').invoices[0];
+  logLine('2026-10-09 00:05', 'BestCheckout', 'Stopped intercepting', 'shop_kiln', kilnInvoice.id, '<span>Invoice past due</span>');
+  logLine('2026-10-04 09:00', 'BestCheckout', 'Charge retry failed', 'shop_kiln', kilnInvoice.id, '<span>Status unchanged</span>');
+  logLine('2026-10-01 09:04', 'BestCheckout', 'Emailed the owner', 'shop_kiln', kilnInvoice.id, 'Card declined');
+  logLine('2026-10-01 00:05', 'BestCheckout', 'Issued invoice', 'shop_kiln', kilnInvoice.id, moneyLog(kilnInvoice.totalCents));
   logLine('2026-10-02 08:16', 'BestCheckout', 'Recorded payment', 'shop_marlow', marlowInvoice.id, invoiceMoneyLog(marlowInvoice, marlowInvoice.totalCents));
   logLine('2026-10-01 00:05', 'BestCheckout', 'Issued invoice', 'shop_marlow', marlowInvoice.id, moneyLog(marlowInvoice.totalCents));
   logLine('2026-10-29 09:00', 'BestCheckout', 'Charge retry failed', 'shop_marlow', marlowOctober.id, '<span>Status unchanged</span>');
@@ -148,6 +162,8 @@
   logLine('2026-10-27 09:08', 'BestCheckout', 'Issued invoice', 'shop_northline', northlineOctober.id, invoiceMoneyLog(northlineOctober, 35000));
   logLine('2026-10-02 08:22', 'BestCheckout', 'Recorded payment', 'shop_linden', lindenInvoice.id, invoiceMoneyLog(lindenInvoice, lindenInvoice.totalCents));
   logLine('2026-10-01 00:05', 'BestCheckout', 'Issued invoice', 'shop_linden', lindenInvoice.id, moneyLog(lindenInvoice.totalCents));
+  logLine('2026-10-02 08:24', 'BestCheckout', 'Recorded payment', 'shop_maple', mapleInvoice.id, invoiceMoneyLog(mapleInvoice, mapleInvoice.totalCents));
+  logLine('2026-10-01 00:05', 'BestCheckout', 'Issued invoice', 'shop_maple', mapleInvoice.id, moneyLog(mapleInvoice.totalCents));
   logLine('2026-10-02 08:20', 'BestCheckout', 'Recorded payment', 'shop_pine', pineInvoice.id, invoiceMoneyLog(pineInvoice, pineInvoice.totalCents));
   logLine('2026-10-01 00:05', 'BestCheckout', 'Issued invoice', 'shop_pine', pineInvoice.id, moneyLog(pineInvoice.totalCents));
   logLine('2026-10-27 09:16', 'BestCheckout', 'Emailed the owner', 'shop_quill', quillOctober.id, 'Card declined');
