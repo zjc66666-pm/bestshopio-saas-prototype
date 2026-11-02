@@ -37,7 +37,14 @@
   settle(findAccount('shop_pine'), { allowance: 2500000, used: true, card: true, sepDays: 30, octDays: 0, sepStatus: 'Paid', sepPaid: 'Oct 2, 2026' });
   settle(findAccount('shop_quill'), { allowance: 2500000, used: true, card: true, sepDays: 30, octDays: 0, sepStatus: 'Paid', sepPaid: 'Oct 2, 2026' });
   settle(findAccount('shop_moss'), { allowance: 2500000, used: true, card: false, sepDays: 30, octDays: 0, sepStatus: 'Past due', sepPaid: '', fallback: true, fallbackOn: 'Oct 8, 2026' });
-  settle(findAccount('shop_marlow'), { allowance: 2500000, used: true, card: false, sepDays: 30, octDays: 0, sepStatus: 'Past due', sepPaid: '' });
+  settle(findAccount('shop_marlow'), { allowance: 2500000, used: true, card: false, sepDays: 30, octDays: 4, sepStatus: 'Paid', sepPaid: 'Oct 2, 2026' });
+  var marlow = findAccount('shop_marlow');
+  var marlowOctober = issuedInvoice(marlow, '2026-10', '2026.10', 'Charge failed', 1200000, 0, 2500000, [
+    { kind: 'License', label: 'Monthly license', detail: '4 of 31 days', amountCents: 1935 },
+    { kind: 'Commission', label: 'Volume commission', detail: '0.5% · $12,000.00', amountCents: 6000 }
+  ]);
+  marlow.october.volumeCents = 1200000;
+  refreshStatus(marlow);
   settle(findAccount('shop_sable'), { allowance: 2500000, used: true, card: true, sepDays: 0, octDays: 21 });
   settle(findAccount('shop_northline'), { allowance: 2500000, used: true, card: true, sepDays: 30, octDays: 31, sepStatus: 'Paid', sepPaid: 'Oct 2, 2026' });
   settle(findAccount('shop_linden'), { allowance: 2500000, used: true, card: true, sepDays: 30, octDays: 31, sepStatus: 'Paid', sepPaid: 'Oct 2, 2026' });
@@ -47,7 +54,7 @@
   sableInvoice.allowanceCents = 2500000;
   sableInvoice.coveredCents = 2500000;
   sable.invoices.push(sableInvoice);
-  sable.billingStatus = 'Past due';
+  refreshStatus(sable);
   var folastInvoice = issuedInvoice(findAccount('shop_folast'), '2026-10', '2026.10', 'Paid', 2000000, 0, null, [
     { kind: 'License', label: 'Monthly license', detail: '31 of 31 days', amountCents: 7500 },
     { kind: 'Commission', label: 'Volume commission', detail: '0.4% · $20,000.00', amountCents: 8000 },
@@ -121,9 +128,18 @@
   logLine('2026-10-01 00:05', 'BestCheckout', 'Issued invoice', 'shop_lavender', lavenderSeptember.id, invoiceMoneyLog(lavenderSeptember, 511000));
   logLine('2026-09-18 15:00', 'ops.amy', 'Set free allowance', 'shop_lavender', '', '<span class="i18n-skip">$25,000</span>');
   logLine('2026-08-04 09:30', 'ops.amy', 'Associated price book', 'shop_lavender', '', 'Standard');
+  logLine('2026-10-08 00:05', 'BestCheckout', 'Stopped intercepting', 'shop_heyjune', heyInvoice.id, '<span>Invoice past due</span>');
+  logLine('2026-10-03 09:00', 'BestCheckout', 'Charge retry failed', 'shop_heyjune', heyInvoice.id, '<span>Status unchanged</span>');
   logLine('2026-10-01 00:12', 'BestCheckout', 'Emailed the owner', 'shop_heyjune', heyInvoice.id, 'No card on file');
   logLine('2026-10-01 00:05', 'BestCheckout', 'Issued invoice', 'shop_heyjune', heyInvoice.id, moneyLog(heyInvoice.totalCents));
+  logLine('2026-10-02 08:16', 'BestCheckout', 'Recorded payment', 'shop_marlow', marlowInvoice.id, invoiceMoneyLog(marlowInvoice, marlowInvoice.totalCents));
   logLine('2026-10-01 00:05', 'BestCheckout', 'Issued invoice', 'shop_marlow', marlowInvoice.id, moneyLog(marlowInvoice.totalCents));
+  logLine('2026-10-29 09:00', 'BestCheckout', 'Charge retry failed', 'shop_marlow', marlowOctober.id, '<span>Status unchanged</span>');
+  logLine('2026-10-27 09:02', 'BestCheckout', 'Emailed the owner', 'shop_marlow', marlowOctober.id, 'No card on file');
+  logLine('2026-10-27 09:00', 'BestCheckout', 'Issued invoice', 'shop_marlow', marlowOctober.id, invoiceMoneyLog(marlowOctober, marlowOctober.totalCents));
+  logLine('2026-10-18 00:05', 'BestCheckout', 'Stopped intercepting', 'shop_sable', sableInvoice.id, '<span>Invoice past due</span>');
+  logLine('2026-10-14 09:00', 'BestCheckout', 'Charge retry failed', 'shop_sable', sableInvoice.id, '<span>Status unchanged</span>');
+  logLine('2026-10-11 09:02', 'BestCheckout', 'Emailed the owner', 'shop_sable', sableInvoice.id, 'Card declined');
   logLine('2026-10-11 09:00', 'BestCheckout', 'Issued invoice', 'shop_sable', sableInvoice.id, moneyLog(sableInvoice.totalCents));
   logLine('2026-10-27 11:21', 'BestCheckout', 'Marked as paid', 'shop_folast', folastInvoice.id, invoiceMoneyLog(folastInvoice, 0));
   logLine('2026-10-27 11:20', 'ops.amy', 'Added credit', 'shop_folast', folastInvoice.id, moneyLog(-15500) + ' <span>VIP partner credit</span>');
@@ -138,6 +154,8 @@
   logLine('2026-10-27 09:14', 'BestCheckout', 'Issued invoice', 'shop_quill', quillOctober.id, invoiceMoneyLog(quillOctober, 44065));
   logLine('2026-10-02 08:18', 'BestCheckout', 'Recorded payment', 'shop_quill', quillSeptember.id, invoiceMoneyLog(quillSeptember, quillSeptember.totalCents));
   logLine('2026-10-01 00:05', 'BestCheckout', 'Issued invoice', 'shop_quill', quillSeptember.id, moneyLog(quillSeptember.totalCents));
+  logLine('2026-10-08 00:05', 'BestCheckout', 'Stopped intercepting', 'shop_moss', mossInvoice.id, '<span>Invoice past due</span>');
+  logLine('2026-10-04 09:00', 'BestCheckout', 'Charge retry failed', 'shop_moss', mossInvoice.id, '<span>Status unchanged</span>');
   logLine('2026-10-01 00:12', 'BestCheckout', 'Emailed the owner', 'shop_moss', mossInvoice.id, 'No card on file');
   logLine('2026-10-01 00:05', 'BestCheckout', 'Issued invoice', 'shop_moss', mossInvoice.id, moneyLog(mossInvoice.totalCents));
   var billPage = { no: 1, size: 20, filter: '' };
@@ -403,8 +421,12 @@
   function refreshStatus(account) {
     var overdue = account.invoices.some(function (invoice) { return invoice.status === 'Past due'; });
     var failed = account.invoices.some(function (invoice) { return invoice.status === 'Charge failed'; });
-    if (!overdue) account.checkoutFallback = false;
-    if (overdue || account.checkoutFallback) { account.billingStatus = 'Past due'; return; }
+    if (overdue) {
+      account.billingStatus = 'Past due';
+      account.checkoutFallback = true;
+      return;
+    }
+    account.checkoutFallback = false;
     if (failed) { account.billingStatus = 'Charge failed'; return; }
     account.billingStatus = account.allowanceCents == null || !account.allowanceUsed ? 'Not billed' : 'Current';
   }
@@ -1211,10 +1233,14 @@
     }
     var priceBook = bookById(account.priceBookId);
     var remaining = remainingAllowanceCents(account);
-    var warning = account.checkoutFallback
-      ? '<div class="ops-note ops-warning">New checkouts use Shopify Checkout. The September invoice was unpaid for 7 days. Paying it turns interception back on.</div>'
-      : (account.billingStatus === 'Past due' ? '<div class="ops-note ops-warning">The September invoice is unpaid. New checkouts fall back to Shopify Checkout after 7 days.</div>'
-        : ((account.failures || []).length ? '<div class="ops-note ops-warning">The card on file was declined when the invoice was issued. The owner was emailed on Oct 27.</div>' : ''));
+    var warning = '';
+    if (account.billingStatus === 'Past due') {
+      warning = '<div class="ops-note ops-warning"><span>Invoices remain unpaid. New checkouts use Shopify Checkout. Paying them turns interception back on.</span></div>';
+    } else if (account.billingStatus === 'Charge failed' && !account.cardOnFile) {
+      warning = '<div class="ops-note ops-warning"><span>No card was on file. The owner was emailed to add a card and pay. New checkouts fall back to Shopify Checkout after 7 days.</span></div>';
+    } else if (account.billingStatus === 'Charge failed') {
+      warning = '<div class="ops-note ops-warning"><span>The card on file was declined when the invoice was issued. The owner was emailed on Oct 27.</span></div>';
+    }
     var next = account.nextBookId ? '<div class="ops-note">November 2026 will use ' + esc(bookById(account.nextBookId).name) + '. October stays on ' + esc(priceBook.name) + '.</div>' : '';
     var kpis = account.lifecycle === 'Active'
       ? '<div class="ops-kpi-grid ops-kpi-grid-3">' +
@@ -1517,7 +1543,10 @@
       if (adjust) adjust.onclick = function () { openAdjustment(account, invoice, root, id); };
       bindActivityPager(scope, invoiceActivityRows(invoice.id), 'invoice:' + invoice.id);
       if (pay) pay.onclick = function () {
-        face.confirmDialog('Record payment', 'Record a payment for this invoice? BestCheckout starts intercepting new checkouts again.', 'Record payment', function () {
+        var payCopy = account.billingStatus === 'Past due'
+          ? 'Record a payment for this invoice? BestCheckout starts intercepting new checkouts again.'
+          : 'Record a payment for this invoice? The account returns to current. Checkout was not turned off.';
+        face.confirmDialog('Record payment', payCopy, 'Record payment', function () {
           invoice.status = 'Paid';
           invoice.paidAt = 'Oct 22, 2026';
           account.failures = [];
@@ -1621,7 +1650,7 @@
     var subject = failed ? 'We could not charge your BestCheckout invoice' : 'Add a card for your BestCheckout invoice';
     var context = failed
       ? 'Prototype-only · email sent because the card on file was declined.'
-      : 'Prototype-only · email sent to the store owner on Oct 1 because no card was on file.';
+      : 'Prototype-only · email sent because no card was on file.';
     var reason = failed
       ? 'The card on file was declined, so it was not charged. Invoice <span class="i18n-skip">' + esc(invoice.number) + '.</span>'
       : 'No card was on file, so it was not charged. Invoice <span class="i18n-skip">' + esc(invoice.number) + '.</span>';
@@ -1648,7 +1677,6 @@
                 '<p class="verification-email-lead">' + reason + '</p>' +
                 '<p class="verification-email-lead">' + next + '</p>' +
                 '<div class="connect-form-actions verification-email-install-actions"><a class="portal-submit" href="' + esc(merchantBillingHref(account, invoice, failed)) + '" target="_blank" rel="noopener">' + esc(cta) + '</a></div>' +
-                '<p class="verification-email-note">Paying this invoice turns BestCheckout checkout back on.</p>' +
               '</main>' +
               '<footer><p>This is an automated message from BestCheckout — please don’t reply.</p><small>© 2026 BestCheckout</small></footer>' +
             '</article>' +
@@ -1708,6 +1736,14 @@
     'Manual surcharge': '手工补收',
     'Card declined': '银行卡扣款失败',
     'The card on file was declined when the invoice was issued. The owner was emailed on Oct 27.': '开账时银行卡扣款失败，已在 10 月 27 日邮件通知店主。',
+    'Invoices remain unpaid. New checkouts use Shopify Checkout. Paying them turns interception back on.': '有账单未支付。新的结账已回到 Shopify Checkout。付清后恢复拦截。',
+    'No card was on file. The owner was emailed to add a card and pay. New checkouts fall back to Shopify Checkout after 7 days.': '没有银行卡。已邮件让店主添加银行卡并付款。7 天后新的结账回到 Shopify Checkout。',
+    'October': '10 月',
+    'September': '9 月',
+    'Charge retry failed': '轮询扣款失败',
+    'Status unchanged': '状态不变',
+    'Stopped intercepting': '停止拦截',
+    'Invoice past due': '账单已逾期',
     'We could not charge your BestCheckout invoice': '这张 BestCheckout 账单扣款失败',
     'Prototype-only · email sent because the card on file was declined.': '仅原型 · 开账时银行卡扣款失败，发给店主的邮件。',
     'The card on file was declined, so it was not charged. Invoice': '银行卡扣款失败，所以没有扣到款。账单',
@@ -1748,7 +1784,7 @@
     'Record a payment for this invoice? BestCheckout starts intercepting new checkouts again.': '记下这笔收款？BestCheckout 会重新拦截新的结账。',
     'No card was on file when the invoice was issued. The owner was emailed on Oct 1.': '开账时没有银行卡，已在 10 月 1 日邮件通知店主。',
     'Add a card for your BestCheckout invoice': '请为这张 BestCheckout 账单绑定银行卡',
-    'Prototype-only · email sent to the store owner on Oct 1 because no card was on file.': '仅原型 · 开账时没有银行卡，于 10 月 1 日发给店主的邮件。',
+    'Prototype-only · email sent because no card was on file.': '仅原型 · 开账时没有银行卡，发给店主的邮件。',
     'No card was on file, so it was not charged. Invoice': '开账时没有银行卡，所以没有扣款。账单',
     'Add a card and pay within 7 days. After that, new checkouts use Shopify Checkout until this invoice is paid.': '请在 7 天内绑定银行卡并付款。逾期后，新的结账会回到 Shopify Checkout，付清后恢复。',
     'Add a card and pay': '绑定银行卡并付款',
