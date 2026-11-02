@@ -1237,9 +1237,9 @@
     if (account.billingStatus === 'Past due') {
       warning = '<div class="ops-note ops-warning"><span>Invoices remain unpaid. New checkouts use Shopify Checkout. Paying them turns interception back on.</span></div>';
     } else if (account.billingStatus === 'Charge failed' && !account.cardOnFile) {
-      warning = '<div class="ops-note ops-warning"><span>No card was on file. The owner was emailed to add a card and pay. New checkouts fall back to Shopify Checkout after 7 days.</span></div>';
+      warning = '<div class="ops-note ops-warning"><span>No card was on file. The owner was emailed to add a card and pay.</span></div>';
     } else if (account.billingStatus === 'Charge failed') {
-      warning = '<div class="ops-note ops-warning"><span>The card on file was declined when the invoice was issued. The owner was emailed on Oct 27.</span></div>';
+      warning = '<div class="ops-note ops-warning"><span>The card on file was declined when the invoice was issued.</span></div>';
     }
     var next = account.nextBookId ? '<div class="ops-note">November 2026 will use ' + esc(bookById(account.nextBookId).name) + '. October stays on ' + esc(priceBook.name) + '.</div>' : '';
     var kpis = account.lifecycle === 'Active'
@@ -1735,9 +1735,9 @@
     'Courtesy credit': '合作优惠抵扣',
     'Manual surcharge': '手工补收',
     'Card declined': '银行卡扣款失败',
-    'The card on file was declined when the invoice was issued. The owner was emailed on Oct 27.': '开账时银行卡扣款失败，已在 10 月 27 日邮件通知店主。',
+    'The card on file was declined when the invoice was issued.': '开账时银行卡扣款失败。',
     'Invoices remain unpaid. New checkouts use Shopify Checkout. Paying them turns interception back on.': '有账单未支付。新的结账已回到 Shopify Checkout。付清后恢复拦截。',
-    'No card was on file. The owner was emailed to add a card and pay. New checkouts fall back to Shopify Checkout after 7 days.': '没有银行卡。已邮件让店主添加银行卡并付款。7 天后新的结账回到 Shopify Checkout。',
+    'No card was on file. The owner was emailed to add a card and pay.': '没有银行卡。已邮件让店主添加银行卡并付款。',
     'October': '10 月',
     'September': '9 月',
     'Charge retry failed': '轮询扣款失败',
