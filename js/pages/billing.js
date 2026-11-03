@@ -1641,9 +1641,9 @@
     return href;
   }
   function merchantAdminOrigin() {
-    return (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
-      ? 'http://127.0.0.1:4200'
-      : 'https://zjc66666-pm.github.io/BestCheckout';
+    var host = location.hostname;
+    if (host === '127.0.0.1' || host === 'localhost') return 'http://127.0.0.1:4200';
+    return 'https://bestcheckout.zjcwork.com';
   }
   function merchantBillingHref(account, invoice, failed) {
     var hash = failed && invoice
