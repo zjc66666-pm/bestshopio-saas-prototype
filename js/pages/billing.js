@@ -826,7 +826,7 @@
       multiCheckHtml('billStoreStatus', 'All billing statuses', billingOptions) +
       multiCheckHtml('billStoreBook', 'All price books', bookFilterOptions) +
       '<div class="ops-filter-tags" id="billStoreTags"></div>';
-    var table = '<table class="ops-table bill-store-table"><thead><tr><th>Store</th><th>Store status</th><th>Status detail</th><th>Billing status</th><th>Price book</th><th>Free allowance</th><th class="ops-col-act">Action</th></tr></thead><tbody></tbody></table>';
+    var table = '<table class="ops-table bill-store-table"><thead><tr><th>Store</th><th>Store status</th><th>Install status</th><th>Billing status</th><th>Price book</th><th>Free allowance</th><th class="ops-col-act">Action</th></tr></thead><tbody></tbody></table>';
     face.render(root, face.page('BestCheckout billing', '', '', listCard(filters, table)), function (scope) {
       var selectedLifecycle = [];
       var selectedBilling = [];
@@ -900,15 +900,14 @@
     return '<span class="ops-status ' + tone + '"><i></i>' + esc(label) + '</span>';
   }
   function storeStatusDetail(store) {
-    if (store.holdReason) return store.holdReason;
     var code = store.installStatus || (store.type === 'bestcheckout' ? 'preparing' : '');
     return ({
       preparing: 'Preparing install link',
       ready: 'Ready to install',
       expired: 'Install link expired',
-      failed: 'Install failed',
       connected: 'Connected',
-      reauth: 'Reauthorization needed'
+      reauth: 'Disabled',
+      failed: 'Disabled'
     })[code] || code || '';
   }
   function storeStatusDetailCell(store) {
