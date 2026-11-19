@@ -813,6 +813,13 @@
       { value: 'Provisioning', label: 'Opening' },
       { value: 'Suspended', label: 'Disabled' }
     ];
+    var installOptions = [
+      { value: 'preparing', label: 'Preparing install link' },
+      { value: 'ready', label: 'Ready to install' },
+      { value: 'expired', label: 'Install link expired' },
+      { value: 'disabled', label: 'Disabled' },
+      { value: 'connected', label: 'Connected' }
+    ];
     var billingOptions = [
       { value: 'Not billed', label: 'Not billed' },
       { value: 'Current', label: 'Current' },
@@ -823,12 +830,14 @@
     var bookFilterOptions = books.map(function (item) { return { value: item.id, label: item.name }; });
     var filters = searchBox('billStoreField', '<option value="name">Store name</option><option value="domain">Domain</option><option value="shopId">Shop ID</option>', 'billStoreSearch') +
       multiCheckHtml('billStoreLifecycle', 'All store statuses', lifecycleOptions) +
+      multiCheckHtml('billStoreInstall', 'All install statuses', installOptions) +
       multiCheckHtml('billStoreStatus', 'All billing statuses', billingOptions) +
       multiCheckHtml('billStoreBook', 'All price books', bookFilterOptions) +
       '<div class="ops-filter-tags" id="billStoreTags"></div>';
     var table = '<table class="ops-table bill-store-table"><thead><tr><th>Store</th><th>Store status</th><th>Install status</th><th>Billing status</th><th>Price book</th><th>Free allowance</th><th class="ops-col-act">Action</th></tr></thead><tbody></tbody></table>';
     face.render(root, face.page('BestCheckout billing', '', '', listCard(filters, table)), function (scope) {
       var selectedLifecycle = [];
+      var selectedInstalls = [];
       var selectedBilling = [];
       var selectedBooks = [];
       var multiState = { open: '', painters: [], paintAll: function () { multiState.painters.forEach(function (paint) { paint(); }); } };
@@ -843,6 +852,7 @@
         var list = stores.filter(function (store) {
           var book = bookForStore(store);
           if (selectedLifecycle.length && selectedLifecycle.indexOf(store.lifecycle) < 0) return false;
+          if (selectedInstalls.length && selectedInstalls.indexOf(installFilterCode(store)) < 0) return false;
           if (selectedBooks.length && selectedBooks.indexOf(book.id) < 0) return false;
           if (selectedBilling.length && selectedBilling.indexOf(billingState(store)) < 0) return false;
           if (!query) return true;
@@ -861,10 +871,11 @@
             '<td>' + allowanceCell(account ? effectiveAllowance(account) : defaultBook().allowanceCents) + '</td>' +
             '<td class="ops-col-act">' + viewAct('#/billing/stores/' + store.id) + '</td></tr>';
         });
-        paintList(scope, rows, 7, field + '|' + query + '|' + selectedLifecycle.join(',') + '|' + selectedBooks.join(',') + '|' + selectedBilling.join(','));
+        paintList(scope, rows, 7, field + '|' + query + '|' + selectedLifecycle.join(',') + '|' + selectedInstalls.join(',') + '|' + selectedBooks.join(',') + '|' + selectedBilling.join(','));
         var tags = [];
         if (raw) tags.push(searchTag(searchFieldLabel(field), raw));
         if (selectedLifecycle.length) tags.push(filterTag('lifecycle', 'Store status', selectedLifecycle.map(function (value) { return optionLabel(lifecycleOptions, value); })));
+        if (selectedInstalls.length) tags.push(filterTag('install', 'Install status', selectedInstalls.map(function (value) { return optionLabel(installOptions, value); })));
         if (selectedBilling.length) tags.push(filterTag('billing', 'Billing status', selectedBilling.map(function (value) { return optionLabel(billingOptions, value); })));
         if (selectedBooks.length) tags.push(filterTag('book', 'Price book', selectedBooks.map(function (value) { return optionLabel(bookFilterOptions, value); })));
         var tagBox = scope.querySelector('#billStoreTags');
@@ -875,6 +886,7 @@
       scope.querySelector('#billStoreSearch').oninput = draw;
       scope.querySelector('#billStoreField').onchange = draw;
       bindMultiCheck(scope, 'billStoreLifecycle', 'All store statuses', lifecycleOptions, selectedLifecycle, draw, multiState);
+      bindMultiCheck(scope, 'billStoreInstall', 'All install statuses', installOptions, selectedInstalls, draw, multiState);
       bindMultiCheck(scope, 'billStoreStatus', 'All billing statuses', billingOptions, selectedBilling, draw, multiState);
       bindMultiCheck(scope, 'billStoreBook', 'All price books', bookFilterOptions, selectedBooks, draw, multiState);
       scope.querySelector('#billStoreTags').onclick = function (event) {
@@ -883,6 +895,7 @@
         var kind = pill.getAttribute('data-clear-bill');
         if (kind === 'keyword') scope.querySelector('#billStoreSearch').value = '';
         if (kind === 'lifecycle') selectedLifecycle.splice(0, selectedLifecycle.length);
+        if (kind === 'install') selectedInstalls.splice(0, selectedInstalls.length);
         if (kind === 'billing') selectedBilling.splice(0, selectedBilling.length);
         if (kind === 'book') selectedBooks.splice(0, selectedBooks.length);
         multiState.paintAll();
@@ -894,6 +907,11 @@
     });
   }
 
+  function installFilterCode(store) {
+    var code = store.installStatus || 'preparing';
+    if (code === 'reauth' || code === 'failed') return 'disabled';
+    return code;
+  }
   function storeLifecycleCell(store) {
     var label = ({ Active: 'Enabled', Provisioning: 'Opening', Suspended: 'Disabled' })[store.lifecycle] || store.lifecycle || '—';
     var tone = label === 'Disabled' ? 'danger' : (label === 'Opening' ? 'warn' : 'ok');
